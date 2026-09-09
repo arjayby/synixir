@@ -20,42 +20,65 @@ function binaryPush(message) {
     payload: message.subarray(eventStart + eventSize) };
 }
 
-test("public SDK sync readiness precedes durability and a second binding shares a Y.Map", async ({ page, context, baseURL }) => {
-  const { url } = await setup(page, baseURL);
-  const releases = [];
-  await page.routeWebSocket("**/socket/websocket**", client => {
-    const server = client.connectToServer();
-    const refs = new Set();
-    const held = [];
-    releases.push(() => held.splice(0).forEach(message => client.send(message)));
-    client.onMessage(message => {
-      const push = binaryPush(message);
-      if (push?.event === "save_update") refs.add(push.ref);
-      server.send(message);
+for (const replyTiming of ["before release", "after release"]) {
+  test(`public SDK sync readiness precedes durability with a reply ${replyTiming}`, async ({ page, context, baseURL }) => {
+    const { url } = await setup(page, baseURL);
+    const releases = [];
+    const replyArrived = Promise.withResolvers();
+    const deliverReply = Promise.withResolvers();
+    const replyHeld = Promise.withResolvers();
+    await page.routeWebSocket("**/socket/websocket**", client => {
+      const server = client.connectToServer();
+      const refs = new Set();
+      const held = [];
+      let holding = true;
+      releases.push(() => {
+        holding = false;
+        held.splice(0).forEach(message => client.send(message));
+      });
+      client.onMessage(message => {
+        const push = binaryPush(message);
+        if (push?.event === "save_update") refs.add(push.ref);
+        server.send(message);
+      });
+      server.onMessage(async message => {
+        if (typeof message === "string") {
+          const [, ref, , event] = JSON.parse(message);
+          if (event === "phx_reply" && refs.delete(ref)) {
+            replyArrived.resolve(message);
+            await deliverReply.promise;
+            if (holding) {
+              held.push(message);
+              replyHeld.resolve();
+              return;
+            }
+          }
+        }
+        client.send(message);
+      });
     });
-    server.onMessage(message => {
-      if (typeof message === "string") {
-        const [, ref, , event] = JSON.parse(message);
-        if (event === "phx_reply" && refs.has(ref)) return held.push(message);
-      }
-      client.send(message);
-    });
+    await page.goto(url);
+    await expect(page.locator("#sdk-state")).toHaveText("connected · saving");
+    // sdk.js awaits connect(): importing its exports completes while saves are held.
+    expect(await page.evaluate(async () => (await import("/sdk.js")).room.state.saveStatus)).toBe("saving");
+    const reply = JSON.parse(await replyArrived.promise);
+    expect(reply[4]).toMatchObject({ status: "ok", response: { saved: true } });
+    // Exercise both arrival orders without depending on runner or network speed.
+    if (replyTiming === "before release") {
+      deliverReply.resolve();
+      await replyHeld.promise;
+    }
+    releases.forEach(release => release());
+    deliverReply.resolve();
+    await saved(page);
+    const peer = await context.newPage();
+    await peer.goto(url);
+    await saved(peer);
+    await page.getByLabel("Room title").fill("Shared settings");
+    await expect(peer.getByLabel("Room title")).toHaveValue("Shared settings");
+    await saved(page);
   });
-  await page.goto(url);
-  await expect(page.locator("#sdk-state")).toHaveText("connected · saving");
-  // sdk.js awaits connect(): importing its exports completes while saves are held.
-  expect(await page.evaluate(async () => (await import("/sdk.js")).room.state.saveStatus)).toBe("saving");
-  await expect.poll(() => releases.length).toBe(1);
-  releases.forEach(release => release());
-  await saved(page);
-  const peer = await context.newPage();
-  await peer.goto(url);
-  await saved(peer);
-  await page.getByLabel("Room title").fill("Shared settings");
-  await expect(peer.getByLabel("Room title")).toHaveValue("Shared settings");
-  releases.forEach(release => release());
-  await saved(page);
-});
+}
 
 test("fresh grants recover a bare SDK after a crash and overlapping disconnect/connect", async ({ page, context, baseURL, backend }) => {
   let grants = 0;
