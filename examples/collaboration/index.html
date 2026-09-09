@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Synixir · Shared document</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <a class="brand" href="/" aria-label="Synixir home"><span aria-hidden="true">s/</span> Synixir</a>
+        <span class="demo-label">Local collaboration demo</span>
+      </header>
+
+      <div class="workspace-heading">
+        <div>
+          <p class="eyebrow">A place to write together</p>
+          <h1>Shared document</h1>
+          <p class="intro">Open this room in another tab. Put your ideas on the same page.</p>
+        </div>
+        <div class="connection-controls">
+          <span id="status" role="status" data-state="connecting">Connecting</span>
+          <button id="connection" type="button" class="subtle">Disconnect</button>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <section class="document-panel" aria-label="Document editor">
+          <div class="editor-toolbar">
+            <span class="document-title" id="document-title">demo</span>
+            <div class="history-controls" role="group" aria-label="Edit history">
+              <button id="undo" type="button" disabled>Undo</button>
+              <button id="redo" type="button" disabled>Redo</button>
+            </div>
+          </div>
+          <div id="editor"></div>
+          <div class="editor-footer">
+            <span id="save-status" aria-live="polite">Not saved</span>
+            <span>Plain text</span>
+          </div>
+        </section>
+
+        <aside aria-label="Room details">
+          <section class="room-panel">
+            <h2>Room</h2>
+            <form method="get" id="room-form">
+              <label for="room">Room ID</label>
+              <input id="room" name="room" value="demo" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" required />
+              <button type="submit">Open room</button>
+            </form>
+            <p class="note">Share this page's URL to invite someone. Each room has its own document.</p>
+          </section>
+          <section class="people-panel" aria-labelledby="people-heading">
+            <div class="section-heading">
+              <h2 id="people-heading">In this room</h2>
+              <span id="participant-count" aria-live="polite">Offline</span>
+            </div>
+            <ul id="participants" aria-label="Participants"></ul>
+            <p class="note">Your cursor appears as <strong id="your-name"></strong>. Names are assigned for this visit.</p>
+          </section>
+          <p id="editor-help" class="note">Type anywhere, select text, or paste a paragraph. Undo affects your own edits.</p>
+        </aside>
+      </div>
+
+      <footer class="page-footer">
+        <p id="save-help">Saved edits stay in this room after everyone leaves.</p>
+        <p>Demo access is granted automatically. No account required.</p>
+      </footer>
+    </main>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

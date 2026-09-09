@@ -12,9 +12,7 @@ defmodule Synixir.Application do
       Synixir.Repo,
       {DNSCluster, query: Application.get_env(:synixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Synixir.PubSub},
-      # Start a worker by calling: Synixir.Worker.start_link(arg)
-      # {Synixir.Worker, arg},
-      # Start to serve requests, typically the last entry
+      Synixir.Documents.Supervisor,
       SynixirWeb.Endpoint
     ]
 

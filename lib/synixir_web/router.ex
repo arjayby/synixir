@@ -7,5 +7,9 @@ defmodule SynixirWeb.Router do
 
   scope "/api", SynixirWeb do
     pipe_through :api
+
+    if Application.compile_env(:synixir, :collaboration_demo, false) do
+      post "/demo/room-token", DemoTokenController, :create
+    end
   end
 end

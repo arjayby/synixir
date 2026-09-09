@@ -1,5 +1,7 @@
 import Config
 
+config :synixir, collaboration_demo: true
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
@@ -17,6 +19,7 @@ config :synixir, Synixir.Repo,
 # you can enable the server option below.
 config :synixir, SynixirWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
+  check_origin: ["http://127.0.0.1:5174"],
   secret_key_base: "H/TYVgTsvGd8TC0BAwvfv/j2Ei0yOkbyvSiS4+55IYDtXWyBGPVSsimIL5CcaxLA",
   server: false
 
