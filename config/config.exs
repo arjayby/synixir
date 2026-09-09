@@ -12,10 +12,17 @@ config :synixir,
   collaboration_demo: false,
   generators: [timestamp_type: :utc_datetime]
 
+config :synixir, :collaboration_limits,
+  max_message_bytes: 1_048_576,
+  max_awareness_bytes: 16_384,
+  messages_per_second: 120,
+  message_burst: 240
+
 # Configure the endpoint
 config :synixir, SynixirWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
+  http: [websocket_options: [max_fragmented_message_size: 2_097_152]],
   render_errors: [
     formats: [json: SynixirWeb.ErrorJSON],
     layout: false

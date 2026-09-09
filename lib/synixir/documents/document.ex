@@ -17,12 +17,12 @@ defmodule Synixir.Documents.Document do
   end
 
   @impl true
-  def handle_call({:sync, message}, {origin, _tag}, state) do
-    case Sync.message_decode(message) do
-      {:ok, {:sync, {kind, update}}} when kind in [:sync_step2, :sync_update] ->
+  def handle_call({:validated, message}, {origin, _tag}, state) do
+    case message do
+      {:update, update} ->
         save(update, origin, state)
 
-      {:ok, {:sync, {:sync_step1, vector}}} ->
+      {:sync_step1, vector} ->
         with {:ok, response} <- Sync.get_sync_step2(state.doc, vector),
              {:ok, request} <- Sync.get_sync_step1(state.doc) do
           replies = Enum.map([response, request], &Sync.message_encode!({:sync, &1}))
@@ -31,22 +31,18 @@ defmodule Synixir.Documents.Document do
           _ -> {:reply, {:error, :invalid_message}, state}
         end
 
-      {:ok, {:awareness, update}} ->
+      {:awareness, update} ->
         case Awareness.apply_update(state.awareness, update, origin) do
           :ok -> {:reply, {:ok, [], false}, state}
           _ -> {:reply, {:error, :invalid_message}, state}
         end
 
-      {:ok, :query_awareness} ->
+      :query_awareness ->
         {:reply, {:ok, awareness_messages(state), false}, state}
 
       _ ->
         {:reply, {:error, :invalid_message}, state}
     end
-  end
-
-  def handle_call({:save_update, update}, {origin, _tag}, state) do
-    save(update, origin, state)
   end
 
   def handle_call(message, from, state), do: SharedDoc.handle_call(message, from, state)

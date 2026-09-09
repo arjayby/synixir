@@ -21,6 +21,25 @@ defmodule SynixirWeb.Telemetry do
 
   def metrics do
     [
+      # Collaboration measurements use bounded labels, without room or user IDs.
+      counter("synixir.channel.join.count", tags: [:result]),
+      summary("synixir.channel.join.duration", unit: {:native, :millisecond}, tags: [:result]),
+      counter("synixir.channel.message.count", tags: [:event, :result]),
+      summary("synixir.channel.message.duration",
+        unit: {:native, :millisecond},
+        tags: [:event, :result]
+      ),
+      summary("synixir.channel.message.bytes", tags: [:event, :result]),
+      counter("synixir.document.save.count", tags: [:result]),
+      sum("synixir.document.save.inserted"),
+      summary("synixir.document.save.duration", unit: {:native, :millisecond}, tags: [:result]),
+      summary("synixir.document.save.bytes", tags: [:result]),
+      counter("synixir.document.restore.count", tags: [:result]),
+      summary("synixir.document.restore.duration", unit: {:native, :millisecond}, tags: [:result]),
+      summary("synixir.document.restore.updates", tags: [:result]),
+      summary("synixir.document.restore.bytes", tags: [:result]),
+      last_value("synixir.documents.active"),
+
       # Phoenix Metrics
       summary("phoenix.endpoint.start.system_time",
         unit: {:native, :millisecond}
@@ -85,9 +104,17 @@ defmodule SynixirWeb.Telemetry do
 
   defp periodic_measurements do
     [
-      # A module, function and arguments to be invoked periodically.
-      # This function must call :telemetry.execute/3 and a metric must be added above.
-      # {SynixirWeb, :count_users, []}
+      {__MODULE__, :count_documents, []}
     ]
+  end
+
+  def count_documents do
+    if Process.whereis(Synixir.Documents.Registry) do
+      :telemetry.execute(
+        [:synixir, :documents],
+        %{active: Registry.count(Synixir.Documents.Registry)},
+        %{}
+      )
+    end
   end
 end

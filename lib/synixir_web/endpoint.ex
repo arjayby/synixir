@@ -2,7 +2,7 @@ defmodule SynixirWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :synixir
 
   socket "/socket", SynixirWeb.DocumentSocket,
-    websocket: true,
+    websocket: [max_frame_size: 2_097_152],
     longpoll: false
 
   # The session will be stored in the cookie and signed,

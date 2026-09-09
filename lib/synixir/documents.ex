@@ -35,11 +35,17 @@ defmodule Synixir.Documents do
 
   @doc "Exchanges a Yjs protocol message. A saved reply follows a committed database write."
   @spec sync(pid(), binary()) :: {:ok, [binary()], boolean()} | {:error, atom()}
-  def sync(doc, message), do: call(doc, {:sync, message})
+  def sync(doc, message), do: request(doc, :sync, message)
 
   @doc "Applies a binary Yjs update and acknowledges it only after PostgreSQL commits it."
   @spec save_update(pid(), binary()) :: {:ok, [], true} | {:error, atom()}
-  def save_update(doc, update), do: call(doc, {:save_update, update})
+  def save_update(doc, update), do: request(doc, :update, update)
+
+  defp request(doc, kind, message) do
+    with {:ok, decoded} <- Synixir.Documents.Protocol.decode(kind, message) do
+      call(doc, {:validated, decoded})
+    end
+  end
 
   defp call(doc, message) do
     GenServer.call(doc, message, 15_000)

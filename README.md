@@ -125,6 +125,9 @@ local cursor. Nothing in awareness is written to the document update log.
 channel has joined and synced. **Reconnecting** appears after a connection is
 lost, while **Disconnected** means you clicked Disconnect. Editing remains
 available offline, and its save status reports any unconfirmed changes.
+Rejected joins show **Access expired or denied** or **Room unavailable** and stop
+retrying that join. **Connect** requests a fresh demo token and retries without
+discarding local edits. Access requests and channel joins time out after 10 seconds.
 
 ## Room ownership and access
 
@@ -188,6 +191,12 @@ document changes would lose those pending updates on a crash. A failed database
 write stops the modified in-memory process without a saved acknowledgement or
 broadcast. A load failure refuses the join instead of serving an empty document.
 
+Before an update reaches the room process, `Synixir.Documents.Protocol` checks
+its size and validates it using a disposable Yex document in the caller. Invalid
+updates, state vectors, and awareness messages are rejected without modifying
+the shared document or disconnecting its other collaborators. Applying an update
+to the live document still happens before its bytes are committed.
+
 `Synixir.Documents.Document` uses `Yex.DocServer` with synchronous requests for
 this ordering. It reuses `Yex.Sync.SharedDoc` callbacks for observers and
 awareness, but does not use its asynchronous update entry point or rely on a
@@ -219,6 +228,48 @@ sync progress. **Saved** confirms database persistence; **Saving**, **Unsaved
 changes**, and **Save failed** do not. A timeout may mean the write committed
 but its reply was lost. Reconnect to retry and obtain confirmation.
 
+## Limits and failures
+
+The defaults in `config/config.exs` are:
+
+| Limit | Default |
+|---|---|
+| Binary channel payload | 1 MiB, including the Yjs protocol envelope when present |
+| Awareness update inside a protocol message | 16 KiB |
+| Message rate per joined channel | 120 messages/second, with a burst of 240 |
+| WebSocket frame or assembled fragmented message | 2 MiB |
+
+The message budget includes updates, awareness, sync requests, and unsupported
+events. It refills over time; excess requests receive `rate_limited` without
+entering the document process. Another collaborator has a separate budget.
+Rejoining starts a new budget. These are per-channel controls, not account or
+IP quotas, and they do not bound the total number of connections or rooms.
+
+Payload sizes and rate settings use the `:collaboration_limits` application
+configuration. The transport limits are configured separately in the endpoint
+and Bandit HTTP options. Restart Phoenix after changing them. Keep payload
+limits below the transport ceiling, allowing space for Phoenix's envelope.
+
+Awareness states must be JSON objects. Optional `user` and `cursor` fields must
+match the example's format: names and shared type names are at most 128 UTF-8
+bytes, colors use six- or eight-digit hex notation, and cursor positions contain
+valid Yjs IDs and integer offsets. Other awareness fields remain available for
+application metadata. Awareness data still does not establish user identity.
+
+Channel failures return `{reason: "message_too_large"}`, `rate_limited`,
+`invalid_message`, `unsupported_message`, `storage_unavailable`, or
+`document_unavailable`. The example explains oversized edits, rejected updates,
+rate limits, and missing acknowledgements next to its save indicator. It keeps
+unconfirmed text in the tab. A transport limit closes the socket before channel
+processing, so it cannot return a channel error reply.
+
+The size cap applies to individual messages, not accumulated document history.
+The example sends full document state when reconnecting, so keep that encoded
+state below 1 MiB. Deleting visible text does not remove all CRDT history. Larger
+documents need chunked sync or a different upload strategy before raising the
+limits. An oversized local edit may need to be copied into a smaller document;
+reconnecting alone cannot make it fit.
+
 ## Document lifetime
 
 Documents are created on demand and remain in memory after all clients leave.
@@ -239,6 +290,44 @@ compaction to control log growth and recovery time.
 Yex uses precompiled native binaries on supported platforms; the installed
 Elixir/OTP versions were checked on Apple Silicon without Rust.
 
+## Telemetry
+
+These events use `:telemetry.execute/3`; `SynixirWeb.Telemetry.metrics/0` defines
+the corresponding counters, summaries, and active-document gauge:
+
+| Event | Measurements | Metadata |
+|---|---|---|
+| `[:synixir, :channel, :join]` | `duration`, `count` | `result` |
+| `[:synixir, :channel, :message]` | `duration`, `count`, `bytes` | `event`, `result` |
+| `[:synixir, :document, :save]` | `duration`, `count`, `bytes`, `inserted` | `result` |
+| `[:synixir, :document, :restore]` | `duration`, `count`, `bytes`, `updates` | `result` |
+| `[:synixir, :documents]` | `active` | none |
+
+Durations use native time units. The metric definitions convert them to
+milliseconds. Message duration includes validation, document queueing, and the
+operation itself. Save duration covers the database write; `inserted: 0` with
+`result: :ok` identifies duplicate bytes already in the log. Restore counts and
+bytes describe the replayed log. Failed restores report zero counts. Active
+documents are sampled every 10 seconds and include rooms with no participants.
+
+The new events contain no document content, tokens, room IDs, or user IDs. Labels
+use a fixed set of event names and outcomes. No metrics exporter or dashboard is
+installed. To inspect save outcomes locally in `iex -S mix phx.server`:
+
+```elixir
+:telemetry.attach(
+  "inspect-document-saves",
+  [:synixir, :document, :save],
+  fn event, measurements, metadata, _config ->
+    IO.inspect({event, measurements, metadata})
+  end,
+  nil
+)
+
+# Remove the handler when finished:
+:telemetry.detach("inspect-document-saves")
+```
+
 ## Checks
 
 ```sh
@@ -250,7 +339,8 @@ mix test
 
 `mix test` creates and migrates `synixir_test` before checking room ownership,
 authorization, save acknowledgements, recovery of pending updates, and database
-failure behavior. PostgreSQL is required. Test partitions append
+failure behavior. It also checks malformed and oversized payloads, message
+budgets, and telemetry outcomes. PostgreSQL is required. Test partitions append
 `MIX_TEST_PARTITION` to the test database name.
 
 Run the browser interoperability test separately after installing its Node.js
@@ -276,6 +366,12 @@ durability test waits for **Saved**, closes all original clients, kills its
 Phoenix process with `SIGKILL`, and recovers the text in a fresh browser context.
 It also covers a Unicode deletion and offline edits across another restart.
 This runs against real PostgreSQL commits, outside the ExUnit SQL sandbox.
+Failure tests hold actual WebSocket save replies to verify acknowledgement
+ordering and timeout handling, reject grants on initial join and rejoin, and
+check that an oversized edit is neither shown as saved nor recovered by a new
+client. The backend still performs the real writes during reply-loss tests.
+Transport tests send oversized frames and fragmented messages over a real
+WebSocket connection and check that both close with code 1009.
 
 The [CI workflow](.github/workflows/ci.yml) runs these checks on pull requests
 and pushes to `main`. It uses the versions in `.tool-versions` and the same
