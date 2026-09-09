@@ -1,0 +1,72 @@
+{
+  "recorded_at": "2026-09-09T15:32:14.292Z",
+  "mode": "closed-loop localhost smoke, 25ms pause per writer",
+  "environment": {
+    "node": "v24.12.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "logical_cpus": 12,
+    "database_pool_size": 10
+  },
+  "clients": 12,
+  "rooms": 3,
+  "writes_per_client": 100,
+  "successful_writes": 1200,
+  "rejected_writes": 0,
+  "generated_update_bytes": 32832,
+  "write_phase_seconds": 7.944,
+  "writes_per_second": 151.06,
+  "save_ms": {
+    "p50": 16.36,
+    "p95": 43.46,
+    "p99": 114.75
+  },
+  "convergence_ms": {
+    "p50": 44.95,
+    "p95": 113.61,
+    "p99": 256.99
+  },
+  "connect_ms": {
+    "p50": 29.51,
+    "p95": 133.49,
+    "p99": 133.49
+  },
+  "reconnect_ms": 74.78,
+  "chunk_bytes": 1100000,
+  "awareness_verified": true,
+  "offline_edit_verified": true,
+  "fresh_reader_verified": true,
+  "reservations_released": true,
+  "server_before": {
+    "memory_bytes": 83547073,
+    "run_queue": 0,
+    "active_channels": 12,
+    "active_documents": 3,
+    "database_queue_seconds_sum": 0.04151998800000001,
+    "database_queue_count": 497
+  },
+  "server_after": {
+    "memory_bytes": 100355525,
+    "run_queue": 0,
+    "active_channels": 12,
+    "active_documents": 3,
+    "database_queue_seconds_sum": 0.9320968790000005,
+    "database_queue_count": 11307
+  },
+  "generator_cpu_ms": {
+    "user": 723.579,
+    "system": 154.372
+  },
+  "total_seconds": 9.755,
+  "stored_documents": {
+    "updates": 75,
+    "users": 12,
+    "rooms_verified": 3,
+    "migrations": [
+      20260909130000,
+      20260909160000,
+      20260909170000
+    ],
+    "snapshots": 3
+  }
+}

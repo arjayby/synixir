@@ -19,6 +19,7 @@ defmodule SynixirWeb.DocumentChannel do
         {:ok, _reply, _socket} -> :ok
         {:error, %{reason: "unauthorized"}} -> :unauthorized
         {:error, %{reason: "document_unavailable"}} -> :document_unavailable
+        {:error, _} -> :quota_exceeded
       end
 
     :telemetry.execute(
@@ -32,6 +33,7 @@ defmodule SynixirWeb.DocumentChannel do
 
   defp authorize_and_observe("document:" <> room_id, %{"token" => token} = params, socket) do
     with {:ok, grant} <- RoomAccess.verify(room_id, token),
+         :ok <- Synixir.Admission.reserve(room_id, grant.user_id),
          :ok <-
            Phoenix.PubSub.subscribe(
              Synixir.PubSub,
@@ -70,8 +72,21 @@ defmodule SynixirWeb.DocumentChannel do
          outgoing_id: 0
        )}
     else
-      {:error, :unauthorized} -> {:error, %{reason: "unauthorized"}}
-      {:error, _reason} -> {:error, %{reason: "document_unavailable"}}
+      {:error, reason} ->
+        Synixir.Admission.release()
+
+        reason =
+          if reason in [
+               :unauthorized,
+               :node_channel_quota,
+               :room_channel_quota,
+               :account_channel_quota,
+               :document_quota
+             ],
+             do: reason,
+             else: :document_unavailable
+
+        {:error, %{reason: Atom.to_string(reason)}}
     end
   end
 

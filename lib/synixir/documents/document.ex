@@ -49,7 +49,7 @@ defmodule Synixir.Documents.Document do
 
         {:reply, {:ok, [], true}, state |> reset_idle() |> schedule_compaction()}
 
-      {:error, reason} when reason in [:unauthorized, :read_only] ->
+      {:error, reason} when reason in [:unauthorized, :read_only, :storage_quota] ->
         {:reply, {:error, reason}, state}
 
       {:error, _} ->
@@ -75,7 +75,7 @@ defmodule Synixir.Documents.Document do
       {:error, {:document_failed, failure}} ->
         failure
 
-      {:error, reason} when reason in [:unauthorized, :read_only] ->
+      {:error, reason} when reason in [:unauthorized, :read_only, :storage_quota] ->
         {:reply, {:error, reason}, state}
 
       {:error, _} ->
@@ -138,12 +138,10 @@ defmodule Synixir.Documents.Document do
   end
 
   defp save(update, origin, state) do
-    case Sync.read_sync_step2(update, state.doc, origin) do
+    case Store.append_applied(state.assigns.doc_name, update, fn ->
+           Sync.read_sync_step2(update, state.doc, origin)
+         end) do
       :ok ->
-        # Save the incoming bytes, including updates waiting for dependencies.
-        # No queued update notification is broadcast until this call completes.
-        :ok = Store.append(state.assigns.doc_name, update)
-
         state =
           assign(state,
             log_updates: state.assigns.log_updates + 1,
@@ -152,8 +150,8 @@ defmodule Synixir.Documents.Document do
 
         {:reply, {:ok, [], true}, schedule_compaction(state)}
 
-      _ ->
-        {:stop, :invalid_message, {:error, :invalid_message}, state}
+      {:error, :storage_quota} ->
+        {:reply, {:error, :storage_quota}, state}
     end
   rescue
     _error -> {:stop, :storage_unavailable, {:error, :storage_unavailable}, state}

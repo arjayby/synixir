@@ -32,6 +32,7 @@ defmodule SynixirWeb.RoomController do
         :forbidden -> 403
         :last_owner -> 409
         :room_unavailable -> 409
+        :room_quota -> 429
         _ -> 422
       end
 

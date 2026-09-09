@@ -46,6 +46,7 @@ defmodule Synixir.MixProject do
       {:y_ex, "~> 0.10.5"},
       {:argon2_elixir, "~> 4.1"},
       {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_metrics_prometheus_core, "~> 1.2.1"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},

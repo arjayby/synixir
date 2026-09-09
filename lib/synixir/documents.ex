@@ -86,9 +86,18 @@ defmodule Synixir.Documents do
     }
 
     case DynamicSupervisor.start_child(Synixir.Documents.Workers, child) do
-      {:ok, pid} -> {:ok, pid}
-      {:error, {:already_started, pid}} -> {:ok, pid}
-      {:error, reason} -> {:error, reason}
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        {:ok, pid}
+
+      {:error, :max_children} ->
+        :telemetry.execute([:synixir, :quota, :rejected], %{count: 1}, %{reason: :document_quota})
+        {:error, :document_quota}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

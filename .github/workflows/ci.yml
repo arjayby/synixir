@@ -13,7 +13,7 @@ jobs:
   test:
     name: Format, compile, and test
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       MIX_ENV: test
 
@@ -78,3 +78,18 @@ jobs:
       - name: Check browser interoperability
         working-directory: examples/collaboration
         run: npm test
+
+      - name: Verify backup restoration and concurrent limits in isolated databases
+        run: python3 scripts/operations/database.py --docker-container '${{ job.services.postgres.id }}' drill --output /tmp/synixir-restore.json
+
+      - name: Exercise SDK load, reconnects, large transfers and persisted replay
+        run: python3 scripts/operations/database.py --docker-container '${{ job.services.postgres.id }}' load --output /tmp/synixir-load.json
+
+      - name: Validate Prometheus configuration, alert behavior and actual metrics
+        env:
+          PROMTOOL_IMAGE: prom/prometheus:v3.5.5@sha256:332c2f43e7e389d74d3893b55bb02fbbd684208e681eeb604641d5d769c0fe2a
+        run: |
+          docker run --rm --network none --entrypoint promtool -v "$PWD/ops:/work:ro" -w /work "$PROMTOOL_IMAGE" check config --syntax-only prometheus.yml
+          docker run --rm --network none --entrypoint promtool -v "$PWD/ops:/work:ro" -w /work "$PROMTOOL_IMAGE" check rules alerts.yml
+          docker run --rm --network none --entrypoint promtool -v "$PWD/ops:/work:ro" -w /work "$PROMTOOL_IMAGE" test rules alerts.test.yml
+          docker run --rm -i --network none --entrypoint promtool "$PROMTOOL_IMAGE" check metrics < /tmp/synixir-load.json.prom

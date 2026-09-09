@@ -1,6 +1,11 @@
 defmodule SynixirWeb.Router do
   use SynixirWeb, :router
 
+  # Probe and scrape requests do not create sessions or need CSRF state.
+  get "/health/live", SynixirWeb.OperationsController, :live
+  get "/health/ready", SynixirWeb.OperationsController, :ready
+  get "/metrics", SynixirWeb.OperationsController, :metrics
+
   pipeline :api do
     plug :accepts, ["json"]
     plug :fetch_session
