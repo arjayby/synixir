@@ -16,7 +16,15 @@ config :synixir, :collaboration_limits,
   max_message_bytes: 1_048_576,
   max_awareness_bytes: 16_384,
   messages_per_second: 120,
-  message_burst: 240
+  message_burst: 240,
+  chunk_bytes: 262_144,
+  max_transfer_bytes: 67_108_864,
+  transfer_timeout_ms: 30_000
+
+config :synixir, :document_lifecycle,
+  idle_timeout_ms: 60_000,
+  compact_after_updates: 256,
+  compact_after_bytes: 4_194_304
 
 # Configure the endpoint
 config :synixir, SynixirWeb.Endpoint,

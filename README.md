@@ -37,7 +37,7 @@ versions in `.tool-versions`. Run the commands below from the project directory.
    mix setup
    ```
 
-   This creates `synixir_dev` and its document update table. For an existing
+   This creates `synixir_dev` and its document update and snapshot tables. For an existing
    checkout, run `mix ecto.migrate` after pulling new migrations.
 
 4. Run the checks below, then start Phoenix:
@@ -180,8 +180,10 @@ available with signed-token authorization.
 
 The `document_updates` table stores incoming Yjs v1 update bytes, indexed by
 room and insertion order. A SHA-256 digest makes repeated delivery of identical
-bytes within a room a no-op in PostgreSQL. Room startup replays the log before
-accepting joins, and normal Yjs state-vector sync supplies missing changes to
+bytes within a room a no-op while those bytes remain in the log. After compaction,
+retrying an older update is still safe because Yjs updates are idempotent. Room
+startup loads the latest snapshot and replays its remaining log before accepting
+joins, and normal Yjs state-vector sync supplies missing changes to
 reconnecting clients.
 
 The room process validates and applies an update, commits its incoming bytes,
@@ -221,7 +223,10 @@ channel.push("save_update", update.slice().buffer)
 ```
 
 The example sends incremental updates through this save path and a full update
-when it reconnects. Duplicate delivery through the standard provider is safe.
+when it reconnects. Its chunk transport adapter splits large uploads, handshake
+responses, and server broadcasts into bounded messages. Only the final chunk
+can confirm a durable save. Duplicate delivery through the standard provider is
+safe.
 Its save tracker waits for acknowledgements covering every local edit, including
 deletions, and ignores late replies from old connections. **Connected** reports
 sync progress. **Saved** confirms database persistence; **Saving**, **Unsaved
@@ -236,6 +241,9 @@ The defaults in `config/config.exs` are:
 |---|---|
 | Binary channel payload | 1 MiB, including the Yjs protocol envelope when present |
 | Awareness update inside a protocol message | 16 KiB |
+| Chunk data | 256 KiB, plus a 13-byte header |
+| Reassembled transfer | 64 MiB |
+| Partial transfer lifetime | 30 seconds from its first chunk |
 | Message rate per joined channel | 120 messages/second, with a burst of 240 |
 | WebSocket frame or assembled fragmented message | 2 MiB |
 
@@ -257,25 +265,63 @@ valid Yjs IDs and integer offsets. Other awareness fields remain available for
 application metadata. Awareness data still does not establish user identity.
 
 Channel failures return `{reason: "message_too_large"}`, `rate_limited`,
-`invalid_message`, `unsupported_message`, `storage_unavailable`, or
+`invalid_message`, `invalid_chunk`, `unsupported_message`, `storage_unavailable`, or
 `document_unavailable`. The example explains oversized edits, rejected updates,
 rate limits, and missing acknowledgements next to its save indicator. It keeps
 unconfirmed text in the tab. A transport limit closes the socket before channel
 processing, so it cannot return a channel error reply.
 
-The size cap applies to individual messages, not accumulated document history.
-The example sends full document state when reconnecting, so keep that encoded
-state below 1 MiB. Deleting visible text does not remove all CRDT history. Larger
-documents need chunked sync or a different upload strategy before raising the
-limits. An oversized local edit may need to be copied into a smaller document;
-reconnecting alone cannot make it fit.
+The 1 MiB cap applies to individual messages, not accumulated document history.
+The example supports larger documents through chunked transfers. The separate
+64 MiB transfer cap bounds reassembly memory and is the practical ceiling for
+encoded reconnect state in this version. Deleting visible text does not remove
+all CRDT history, and log compaction does not guarantee a smaller encoded state.
+An edit or reconnect state beyond the transfer cap needs a smaller document or
+an explicitly configured higher cap with sufficient server and browser memory.
+
+### Chunked sync protocol
+
+A client opts in with `chunked_sync: 1` in its authorized join parameters. The
+join reply includes `transfer` with `max_message_bytes`, `chunk_bytes`,
+`max_transfer_bytes`, and `transfer_timeout_ms`. The example's
+[chunked-transport.js](examples/collaboration/chunked-transport.js) wraps the
+existing Phoenix channel provider. Clients without this option keep the original
+protocol and per-message size limit.
+
+Large client messages use the binary `transfer_chunk` event. Each payload has a
+13-byte header followed by data. Header fields are an unsigned one-byte event
+kind (`0` for `yjs`, `1` for `yjs_sync`, `2` for `save_update`), then unsigned
+32-bit big-endian transfer ID, byte offset, and total reassembled byte length.
+Offsets must be contiguous. A chunk at offset zero starts or replaces the
+channel's one partial upload. Later chunks must match its kind, ID and total.
+Each fragment consumes the existing per-channel message budget. The example
+sends fragments sequentially with acknowledgements and pacing.
+
+Intermediate replies are `{saved: false}` and do not change the shared document
+or database. After the last chunk, the server validates the complete original
+message in a disposable document, then applies and commits its raw update bytes
+through the same save path as an ordinary message. Only that successful commit
+returns `{saved: true}`. An incomplete transfer expires after 30 seconds and is
+also discarded when the channel exits. Reconnecting retries from the beginning.
+Malformed or discontinuous fragments return `invalid_chunk`; expired transfers
+must start again at offset zero. Payload and awareness validation remain active.
+
+Large server messages arrive as `yjs_chunk` with the same header and kind `0`.
+The adapter reassembles a whole message before delivering it to the Yjs provider.
+It bounds incoming memory and outgoing queued bytes, resets on connection
+changes, and preserves the save tracker's stale-reply protection. A protocol
+response beyond the negotiated cap fails sync; it cannot mark a partial document
+as connected. The 2 MiB WebSocket limits still apply to every transport message.
 
 ## Document lifetime
 
-Documents are created on demand and remain in memory after all clients leave.
-After a document crash or server restart, the next join opens a process and
-restores its committed updates. Channels attached to a failed process close so
-clients can rejoin. Document processes use temporary supervision to avoid an
+Documents are created on demand and unload after 60 seconds without an observer.
+A new join cancels the idle timer; the final observer leaving or crashing starts
+a new grace period. Rooms opened by server code without an observer also expire
+after inactivity. Idle workers stop normally and leave the Registry; the next
+join starts a worker and restores its committed snapshot and remaining updates.
+After a document crash or server restart, recovery uses the same path. Channels
+attached to a failed process close so clients can rejoin. Document processes use temporary supervision to avoid an
 automatic restart loop during a database outage; other rooms keep running.
 
 Use a new room ID for a fresh document. Restarting Phoenix no longer resets
@@ -283,9 +329,37 @@ saved content. Offline changes remain only in that tab until acknowledged as
 saved; closing or reloading an offline tab loses unsent edits. Existing content
 from the earlier memory-only implementation is not imported automatically.
 
-The update log is append-only. Compaction, snapshots, retention, idle eviction,
-and multi-node ownership are not implemented yet. Long-lived rooms will need
-compaction to control log growth and recovery time.
+### Snapshots and compaction
+
+Incoming updates first enter the append-only `document_updates` log. The room
+queues compaction after 256 save submissions or 4 MiB of submitted update bytes
+since its last successful compaction. Compaction runs serially in the room
+worker; large merges can delay that room's requests. On restoration, the remaining log counts
+toward those thresholds. Settings live in `:document_lifecycle` as
+`compact_after_updates`, `compact_after_bytes`, and `idle_timeout_ms`.
+Trusted server code can also request `Synixir.Documents.compact(document_pid)`.
+
+Compaction merges the previous snapshot with the raw committed update bytes via
+`Yex.merge_updates/1`. The `document_snapshots` row stores that replay update,
+its SHA-256 checksum, and the last covered update ID. Snapshot replacement and
+deletion of covered log rows happen in one PostgreSQL transaction. Append,
+restore, and compaction take the same per-room transaction lock, so restoration
+cannot observe a snapshot and tail from different compaction states. A process
+crash rolls back an unfinished transaction; a failed compaction retains the
+previous snapshot and log and is retried after another save. Saved edits do not
+depend on compaction or graceful shutdown.
+
+Yex 0.10.5's `encode_state_as_update/1` omits pending inserts and delete sets
+waiting for missing dependencies. Storage snapshots use raw update merging to
+retain those dependencies and deletions,
+even across repeated compaction. A checksum mismatch, invalid replay data, or
+storage read error refuses restoration. Awareness remains ephemeral. The
+[research and probe results](docs/research/storage-lifecycle.md) explain the pinned
+library behavior.
+
+These snapshots consolidate CRDT updates and duplicate history; they do not
+provide user-visible versions, retention, or garbage collection of all deleted
+history. Multi-node ownership remains outside this milestone.
 
 Yex uses precompiled native binaries on supported platforms; the installed
 Elixir/OTP versions were checked on Apple Silicon without Rust.
@@ -301,13 +375,16 @@ the corresponding counters, summaries, and active-document gauge:
 | `[:synixir, :channel, :message]` | `duration`, `count`, `bytes` | `event`, `result` |
 | `[:synixir, :document, :save]` | `duration`, `count`, `bytes`, `inserted` | `result` |
 | `[:synixir, :document, :restore]` | `duration`, `count`, `bytes`, `updates` | `result` |
+| `[:synixir, :document, :compact]` | `duration`, `count`, `bytes`, `updates` | `result` |
+| `[:synixir, :document, :unload]` | `count` | none |
 | `[:synixir, :documents]` | `active` | none |
 
 Durations use native time units. The metric definitions convert them to
 milliseconds. Message duration includes validation, document queueing, and the
 operation itself. Save duration covers the database write; `inserted: 0` with
 `result: :ok` identifies duplicate bytes already in the log. Restore counts and
-bytes describe the replayed log. Failed restores report zero counts. Active
+bytes describe the replayed log. Failed restores report zero counts. Compaction reports removed log rows and the
+resulting snapshot size. Idle unloads increment a counter. Active
 documents are sampled every 10 seconds and include rooms with no participants.
 
 The new events contain no document content, tokens, room IDs, or user IDs. Labels
@@ -340,7 +417,11 @@ mix test
 `mix test` creates and migrates `synixir_test` before checking room ownership,
 authorization, save acknowledgements, recovery of pending updates, and database
 failure behavior. It also checks malformed and oversized payloads, message
-budgets, and telemetry outcomes. PostgreSQL is required. Test partitions append
+budgets, and telemetry outcomes. Lifecycle checks cover repeated compaction with
+pending dependencies and deletions, corrupt snapshots, idle observer races,
+chunk validation and expiry, and killing a compactor after its uncommitted
+snapshot write. The crash test uses real commits in a unique room and cleans up
+only that room's data. PostgreSQL is required. Test partitions append
 `MIX_TEST_PARTITION` to the test database name.
 
 Run the browser interoperability test separately after installing its Node.js
@@ -370,7 +451,9 @@ Failure tests hold actual WebSocket save replies to verify acknowledgement
 ordering and timeout handling, reject grants on initial join and rejoin, and
 check that an oversized edit is neither shown as saved nor recovered by a new
 client. The backend still performs the real writes during reply-loss tests.
-Transport tests send oversized frames and fragmented messages over a real
+Lifecycle browser tests exercise documents above 1 MiB, chunked broadcasts,
+offline concurrent edits and deletions, snapshot recovery after `SIGKILL`,
+interrupted uploads, and missing final chunk acknowledgements. Transport tests send oversized frames and fragmented messages over a real
 WebSocket connection and check that both close with code 1009.
 
 The [CI workflow](.github/workflows/ci.yml) runs these checks on pull requests

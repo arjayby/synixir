@@ -109,7 +109,20 @@ test("rejected access stops retrying the old grant and keeps local edits for a f
   await expectText(page, "After reconnect. Keep my local draft");
 });
 
-test("an oversized edit is rejected visibly and does not enter the saved document", async ({ page, context, baseURL }) => {
+test("a client without chunk support still rejects oversized messages", async ({ page, context, baseURL }) => {
+  await page.routeWebSocket("**/socket/websocket**", client => {
+    const server = client.connectToServer();
+    client.onMessage(message => {
+      if (typeof message === "string") {
+        const payload = JSON.parse(message);
+        if (payload[3] === "phx_join") {
+          delete payload[4].chunked_sync;
+          return server.send(JSON.stringify(payload));
+        }
+      }
+      server.send(message);
+    });
+  });
   const url = `${baseURL}/?room=oversized-${randomUUID()}`;
   await page.goto(url);
   await connected(page);
@@ -117,7 +130,7 @@ test("an oversized edit is rejected visibly and does not enter the saved documen
   await editor(page).click();
   await page.keyboard.insertText("x".repeat(1_048_577));
   await expect(page.locator("#save-status")).toHaveText("Save failed");
-  await expect(page.locator("#save-help")).toContainText("exceeds the server limit");
+  await expect(page.locator("#save-help")).toContainText("exceeds the transfer limit");
   await page.close();
   const reader = await context.newPage();
   await reader.goto(url);

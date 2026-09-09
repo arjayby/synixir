@@ -5,58 +5,147 @@ defmodule Synixir.Documents.Store do
   alias Synixir.Repo
 
   def restore(room_id, doc) do
-    started = System.monotonic_time()
+    measure(:restore, %{updates: 0, bytes: 0}, fn ->
+      locked(room_id, fn ->
+        snapshot = snapshot(room_id)
 
-    try do
-      updates =
-        Repo.all(
-          from update in "document_updates",
-            where: update.room_id == ^room_id,
-            order_by: update.id,
-            select: update.data
-        )
+        updates =
+          Repo.all(
+            from u in "document_updates",
+              where: u.room_id == ^room_id,
+              order_by: u.id,
+              select: u.data
+          )
 
-      Yex.Doc.transaction(doc, :restore, fn ->
-        Enum.each(updates, fn update -> :ok = Yex.apply_update(doc, update) end)
+        data = if snapshot, do: [checked_snapshot!(snapshot) | updates], else: updates
+
+        Yex.Doc.transaction(doc, :restore, fn ->
+          Enum.each(data, fn update -> :ok = Yex.apply_update(doc, update) end)
+        end)
+
+        stats = %{updates: length(updates), bytes: bytes(updates)}
+        {stats, %{updates: length(data), bytes: bytes(data)}}
       end)
-
-      record(:restore, started, :ok, %{
-        updates: length(updates),
-        bytes: Enum.reduce(updates, 0, &(byte_size(&1) + &2))
-      })
-
-      :ok
-    rescue
-      error ->
-        record(:restore, started, :storage_unavailable, %{updates: 0, bytes: 0})
-        reraise error, __STACKTRACE__
-    end
+    end)
   end
 
   def append(room_id, update) do
+    measure(:save, %{bytes: byte_size(update), inserted: 0}, fn ->
+      inserted =
+        locked(room_id, fn ->
+          {inserted, _} =
+            Repo.insert_all(
+              "document_updates",
+              [
+                %{
+                  room_id: room_id,
+                  data: update,
+                  digest: :crypto.hash(:sha256, update),
+                  inserted_at: DateTime.utc_now()
+                }
+              ],
+              on_conflict: :nothing,
+              conflict_target: [:room_id, :digest]
+            )
+
+          inserted
+        end)
+
+      {:ok, %{bytes: byte_size(update), inserted: inserted}}
+    end)
+  end
+
+  # Merge bytes, never a materialized Yex document: encode_state_as_update/1 in
+  # Yex 0.10.5 omits pending structs and pending delete sets. A merged update is
+  # a complete replay snapshot, including data awaiting missing dependencies.
+  def compact(room_id) do
+    measure(:compact, %{updates: 0, bytes: 0}, fn ->
+      locked(room_id, fn ->
+        previous = snapshot(room_id)
+
+        rows =
+          Repo.all(
+            from u in "document_updates",
+              where: u.room_id == ^room_id,
+              order_by: u.id,
+              select: %{id: u.id, data: u.data}
+          )
+
+        case rows do
+          [] ->
+            {:ok, %{updates: 0, bytes: 0}}
+
+          _ ->
+            updates = Enum.map(rows, & &1.data)
+            inputs = if previous, do: [checked_snapshot!(previous) | updates], else: updates
+            {:ok, data} = Yex.merge_updates(inputs)
+            through_id = List.last(rows).id
+
+            Repo.insert_all(
+              "document_snapshots",
+              [
+                %{
+                  room_id: room_id,
+                  through_id: through_id,
+                  data: data,
+                  digest: :crypto.hash(:sha256, data),
+                  inserted_at: DateTime.utc_now()
+                }
+              ],
+              on_conflict: {:replace, [:through_id, :data, :digest, :inserted_at]},
+              conflict_target: [:room_id]
+            )
+
+            Repo.delete_all(
+              from u in "document_updates",
+                where: u.room_id == ^room_id and u.id <= ^through_id
+            )
+
+            {:ok, %{updates: length(rows), bytes: byte_size(data)}}
+        end
+      end)
+    end)
+  end
+
+  defp snapshot(room_id) do
+    Repo.one(
+      from s in "document_snapshots",
+        where: s.room_id == ^room_id,
+        select: %{data: s.data, digest: s.digest}
+    )
+  end
+
+  defp checked_snapshot!(%{data: data, digest: digest}) do
+    if :crypto.hash(:sha256, data) != digest, do: raise("snapshot checksum mismatch")
+    data
+  end
+
+  # All store operations share a per-room transaction lock. This also prevents
+  # restore from seeing a new snapshot with an old log (or the reverse), and
+  # serializes maintenance callers with append. Hash collisions only serialize
+  # unrelated rooms; they cannot mix their data.
+  defp locked(room_id, fun) do
+    {:ok, result} =
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [room_id])
+        fun.()
+      end)
+
+    result
+  end
+
+  defp bytes(updates), do: Enum.reduce(updates, 0, &(byte_size(&1) + &2))
+
+  defp measure(operation, failure, fun) do
     started = System.monotonic_time()
 
     try do
-      {inserted, _} =
-        Repo.insert_all(
-          "document_updates",
-          [
-            %{
-              room_id: room_id,
-              data: update,
-              digest: :crypto.hash(:sha256, update),
-              inserted_at: DateTime.utc_now()
-            }
-          ],
-          on_conflict: :nothing,
-          conflict_target: [:room_id, :digest]
-        )
-
-      record(:save, started, :ok, %{bytes: byte_size(update), inserted: inserted})
-      :ok
+      {result, measurements} = fun.()
+      record(operation, started, :ok, measurements)
+      result
     rescue
       error ->
-        record(:save, started, :storage_unavailable, %{bytes: byte_size(update), inserted: 0})
+        record(operation, started, :storage_unavailable, failure)
         reraise error, __STACKTRACE__
     end
   end

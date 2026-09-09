@@ -48,7 +48,22 @@ export const test = base.extend({
 
     try {
       await start();
-      await use({ restart: async () => { await stop(); await start(); } });
+      await use({
+        restart: async () => { await stop(); await start(); },
+        compact: room => {
+          // Use the production store against committed test data. Pass the room
+          // through the environment so it can never become executable code.
+          const maintenanceEnv = { ...env, SYNIXIR_TEST_ROOM: room };
+          delete maintenanceEnv.PHX_SERVER;
+          return execFileSync("mix", ["run", "-e", `
+            room = System.fetch_env!("SYNIXIR_TEST_ROOM")
+            :ok = Synixir.Documents.Store.compact(room)
+            %{rows: [[count]]} = Synixir.Repo.query!(
+              "SELECT count(*) FROM document_snapshots WHERE room_id = $1", [room])
+            if count != 1, do: raise("snapshot missing")
+          `], { cwd, env: maintenanceEnv }).toString();
+        },
+      });
     } finally {
       await stop();
     }

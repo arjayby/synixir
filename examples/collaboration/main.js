@@ -1,6 +1,7 @@
 import { Socket } from "phoenix";
 import { PhoenixChannelProvider } from "y-phoenix-channel";
 import * as Y from "yjs";
+import { chunkedSocket } from "./chunked-transport.js";
 import { trackSaveStatus } from "./save-status.js";
 import { createEditor } from "./editor.js";
 import { showParticipants } from "./presence.js";
@@ -14,7 +15,7 @@ document.querySelector("#document-title").textContent = roomId;
 const doc = new Y.Doc();
 const text = doc.getText("content");
 const socket = new Socket("/socket");
-const provider = new PhoenixChannelProvider(socket, `document:${roomId}`, doc, {
+const provider = new PhoenixChannelProvider(chunkedSocket(socket), `document:${roomId}`, doc, {
   connect: false,
   // Every update must go through Phoenix, including when using two local tabs.
   disableBc: true,
@@ -26,7 +27,7 @@ const stopParticipants = showParticipants(provider, userId);
 const destroyEditor = createEditor(text, provider.awareness);
 let unsaved = false;
 const saveErrors = {
-  message_too_large: "This update exceeds the server limit. Copy your text before leaving and use a smaller document.",
+  message_too_large: "This update exceeds the transfer limit. Copy your text before leaving and use a smaller document.",
   rate_limited: "Too many updates at once. Wait a moment, then disconnect and connect to retry. Keep this tab open.",
   invalid_message: "The server rejected this update. Copy your text before leaving this tab.",
   timeout: "The save acknowledgement did not arrive. Disconnect and connect again to confirm your edits. Keep this tab open.",
@@ -88,6 +89,7 @@ async function connect() {
       connection.textContent = "Connect";
       showStatus();
     };
+    channel.on("sync_error", () => rejectJoin("Document sync failed. Keep this tab open."));
     // Phoenix reuses joinPush on automatic rejoin. Surface a rejected grant
     // instead of retrying the same expired token indefinitely.
     channel.joinPush.receive("error", ({ reason }) => rejectJoin(reason === "unauthorized"
