@@ -38,6 +38,11 @@ defmodule SynixirWeb.Telemetry do
       summary("synixir.document.restore.duration", unit: {:native, :millisecond}, tags: [:result]),
       summary("synixir.document.restore.updates", tags: [:result]),
       summary("synixir.document.restore.bytes", tags: [:result]),
+      counter("synixir.document.compact.count", tags: [:result]),
+      summary("synixir.document.compact.duration", unit: {:native, :millisecond}, tags: [:result]),
+      summary("synixir.document.compact.updates", tags: [:result]),
+      summary("synixir.document.compact.bytes", tags: [:result]),
+      counter("synixir.document.unload.count"),
       last_value("synixir.documents.active"),
 
       # Phoenix Metrics

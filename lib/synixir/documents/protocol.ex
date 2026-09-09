@@ -5,10 +5,14 @@ defmodule Synixir.Documents.Protocol do
 
   # Decode and validate in the caller before entering the shared room process.
   # A disposable document keeps malformed client data away from live state.
-  def decode(kind, message) when is_binary(message) do
+  def decode(kind, message, mode \\ :message)
+
+  def decode(kind, message, mode) when is_binary(message) do
     limits = Application.fetch_env!(:synixir, :collaboration_limits)
 
-    if byte_size(message) <= Keyword.fetch!(limits, :max_message_bytes) do
+    maximum = if mode == :transfer, do: :max_transfer_bytes, else: :max_message_bytes
+
+    if byte_size(message) <= Keyword.fetch!(limits, maximum) do
       validate(kind, message, limits)
     else
       {:error, :message_too_large}
@@ -17,7 +21,7 @@ defmodule Synixir.Documents.Protocol do
     _error -> {:error, :invalid_message}
   end
 
-  def decode(_kind, _message), do: {:error, :invalid_message}
+  def decode(_kind, _message, _mode), do: {:error, :invalid_message}
 
   defp validate(:update, update, _limits) do
     case Yex.apply_update(Doc.new(), update) do

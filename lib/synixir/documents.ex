@@ -2,7 +2,7 @@ defmodule Synixir.Documents do
   @moduledoc """
   Finds or starts the single document process for a room on this node.
 
-  Documents remain alive when clients leave. Opening a stopped room restores
+  Idle documents unload after the configured grace period. Opening a stopped room restores
   its committed updates from PostgreSQL before it can serve requests. Callers
   must authorize access before opening a room on behalf of a client.
   """
@@ -41,8 +41,17 @@ defmodule Synixir.Documents do
   @spec save_update(pid(), binary()) :: {:ok, [], true} | {:error, atom()}
   def save_update(doc, update), do: request(doc, :update, update)
 
-  defp request(doc, kind, message) do
-    with {:ok, decoded} <- Synixir.Documents.Protocol.decode(kind, message) do
+  @doc "Compacts committed updates into a lossless replay snapshot."
+  def compact(doc), do: call(doc, :compact)
+
+  @doc false
+  def transfer(doc, event, message) do
+    kind = if event == "save_update", do: :update, else: :sync
+    request(doc, kind, message, :transfer)
+  end
+
+  defp request(doc, kind, message, mode \\ :message) do
+    with {:ok, decoded} <- Synixir.Documents.Protocol.decode(kind, message, mode) do
       call(doc, {:validated, decoded})
     end
   end
