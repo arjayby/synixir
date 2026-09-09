@@ -589,8 +589,12 @@ resolution would change `mix.lock`. GitHub runs the workflow once the file is
 pushed as part of a pull request or to `main`.
 
 Production runtime configuration is in `config/runtime.exs`. It reads
-`DATABASE_URL` and `SECRET_KEY_BASE`, with optional `PHX_HOST`, `PORT`, and
-`POOL_SIZE` settings. Production provisioning and deployment are not configured.
+`DATABASE_URL`, `SECRET_KEY_BASE` and an HTTPS `SYNIXIR_PUBLIC_URL`, with optional
+`PORT` and `POOL_SIZE` settings. The [local Docker staging runbook](docs/deployment.md)
+builds a production release with the browser assets, a private PostgreSQL database,
+an HTTPS gateway and Prometheus. It includes a packaged browser pilot, verified
+backups and single-node replacement. A separate CI job runs that pilot against
+the final AMD64 image. Public hosting remains a separate deployment decision.
 
 Generated with the [Phoenix 1.8.13 generator](https://phoenix.hexdocs.pm/1.8.13/Mix.Tasks.Phx.New.html),
 using PostgreSQL and disabling HTML, assets, LiveDashboard, Gettext, and mailer

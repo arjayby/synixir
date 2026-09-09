@@ -1,6 +1,8 @@
 defmodule SynixirWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :synixir
 
+  def public_authority, do: URI.parse(url()).authority
+
   socket "/socket", SynixirWeb.DocumentSocket,
     websocket: [max_frame_size: 2_097_152],
     longpoll: false

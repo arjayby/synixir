@@ -87,15 +87,16 @@ class Database:
         private_json(str(archive) + ".json", metadata)
         return metadata
 
-    def restore(self, archive, target):
+    def restore(self, archive, target, role=None):
         assert ISOLATED.fullmatch(target)
         metadata = json.loads(Path(str(archive) + ".json").read_text())
         with archive.open("rb") as data:
             if hashlib.file_digest(data, "sha256").hexdigest() != metadata["sha256"]:
                 raise ValueError("Archive checksum mismatch")
             data.seek(0)
+            role_args = ["--role", role] if role else []
             run(self.command("pg_restore", "--single-transaction", "--exit-on-error",
-                             "--no-owner", "--no-privileges", "--dbname", target), stdin=data)
+                             "--no-owner", "--no-privileges", "--dbname", target, *role_args), stdin=data)
 
 
 def app_env(database):

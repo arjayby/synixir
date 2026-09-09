@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-09-09T16:15:38Z",
+  "image": "synixir:step11-amd64",
+  "https": true,
+  "secure_cookies": true,
+  "collaboration_and_roles": true,
+  "offline_reconnect": true,
+  "same_image_upgrade": true,
+  "private_metrics_scraped": true,
+  "restored_database": {
+    "migrations": [
+      20260909130000,
+      20260909160000,
+      20260909170000
+    ],
+    "updates": 6,
+    "rooms_verified": 1,
+    "snapshots": 0,
+    "users": 3
+  },
+  "native_libraries": {
+    "otp": "27",
+    "architecture": "x86_64-pc-linux-gnu",
+    "argon2": true,
+    "yex": true
+  },
+  "database_outage_recovery": true,
+  "image_id": "sha256:a162cd936497724c84dea3741647e524559b4036de0fbd8f01f71f423abb3dee",
+  "scope": "Local Docker AMD64 rehearsal under emulation on ARM64; not a native AMD64 capacity benchmark",
+  "build_erl_flags": "+JMsingle true",
+  "runtime_erl_flags": "default"
+}
