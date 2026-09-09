@@ -2,11 +2,14 @@ import { Socket } from "phoenix";
 import { PhoenixChannelProvider } from "y-phoenix-channel";
 import * as Y from "yjs";
 import { trackSaveStatus } from "./save-status.js";
+import { createEditor } from "./editor.js";
+import { showParticipants } from "./presence.js";
 import "./style.css";
 
 const roomId = new URL(window.location.href).searchParams.get("room") ?? "demo";
 const userId = crypto.randomUUID();
 document.querySelector("#room").value = roomId;
+document.querySelector("#document-title").textContent = roomId;
 
 const doc = new Y.Doc();
 const text = doc.getText("content");
@@ -19,25 +22,36 @@ const provider = new PhoenixChannelProvider(socket, `document:${roomId}`, doc, {
 
 const status = document.querySelector("#status");
 const connection = document.querySelector("#connection");
-const output = document.querySelector("#document");
-const input = document.querySelector("#insert-text");
+const stopParticipants = showParticipants(provider, userId);
+const destroyEditor = createEditor(text, provider.awareness);
+let unsaved = false;
 const stopSaveStatus = trackSaveStatus(doc, provider, (value) => {
-  document.querySelector("#save-status").textContent = value;
+  const saveStatus = document.querySelector("#save-status");
+  saveStatus.textContent = value;
+  saveStatus.dataset.state = value === "Saved" ? "saved" : value === "Save failed" ? "failed" : "unsaved";
+  unsaved = ["Saving", "Unsaved changes", "Save failed"].includes(value);
+  document.querySelector("#save-help").textContent = value === "Save failed"
+    ? "Save could not be confirmed. Disconnect and connect again to retry. Keep this tab open."
+    : unsaved ? "Keep this tab open until Saved appears. Offline edits stay in this tab until you reconnect."
+      : "Saved edits stay in this room after everyone leaves.";
 });
 let connected = false;
 let connectionError = "";
+let hasConnected = false;
+let transportStatus = "connecting";
 
 function showStatus() {
-  status.textContent = connectionError || (!connected
-    ? "Disconnected"
-    : provider.synced
-      ? "Connected"
-      : "Connecting");
+  const synced = transportStatus === "connected" && provider.synced;
+  status.textContent = connectionError || (!connected ? "Disconnected"
+    : synced ? "Connected" : hasConnected ? "Reconnecting" : "Connecting");
+  status.dataset.state = connectionError ? "error" : !connected ? "disconnected" : synced ? "connected" : "connecting";
+  if (connected && synced) hasConnected = true;
 }
 
 async function connect() {
   connected = true;
   connectionError = "";
+  transportStatus = "connecting";
   connection.disabled = true;
   connection.textContent = "Disconnect";
   showStatus();
@@ -65,24 +79,8 @@ async function connect() {
   }
 }
 
-provider.on("status", showStatus);
+provider.on("status", ({ status }) => { transportStatus = status; showStatus(); });
 provider.on("sync", showStatus);
-text.observe(() => {
-  output.value = text.toString();
-});
-
-document.querySelector("#insert-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (input.value) {
-    text.insert(0, input.value);
-    input.value = "";
-  }
-});
-
-document.querySelector("#delete-first").addEventListener("click", () => {
-  const first = Array.from(text.toString())[0];
-  if (first) text.delete(0, first.length);
-});
 
 connection.addEventListener("click", () => {
   if (connected) {
@@ -98,9 +96,23 @@ connection.addEventListener("click", () => {
 
 window.addEventListener("pagehide", () => {
   stopSaveStatus();
+  stopParticipants();
+  destroyEditor();
   provider.destroy();
   socket.disconnect();
   doc.destroy();
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (unsaved) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
+// A page restored from the back/forward cache needs a fresh connection and editor.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) window.location.reload();
 });
 
 connect();

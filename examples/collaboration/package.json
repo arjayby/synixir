@@ -11,7 +11,11 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@codemirror/commands": "6.11.0",
+    "@codemirror/state": "6.7.4",
+    "@codemirror/view": "6.43.11",
     "phoenix": "1.8.13",
+    "y-codemirror.next": "0.3.6",
     "y-phoenix-channel": "0.3.0",
     "yjs": "13.6.32"
   },

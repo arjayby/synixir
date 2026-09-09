@@ -4,10 +4,11 @@ Synixir is an Elixir/Phoenix collaboration backend in early development.
 It connects browser Yjs documents to supervised Yex processes through Phoenix
 Channels. Each room has its own document process backed by a PostgreSQL update
 log, and clients need a signed room access token to join. The browser example
-demonstrates room isolation, concurrent edits, and recovery after a server crash.
+provides a shared plain text editor with live cursors, participant information,
+and recovery after a server crash.
 
-This implementation runs on one Phoenix node. Account authentication, a full
-editor UI, and a public client SDK are still planned.
+This implementation runs on one Phoenix node. Account authentication and a
+public client SDK are still planned.
 
 ## Local setup
 
@@ -81,28 +82,49 @@ Both start in room `demo`. The example automatically requests a local demo
 token for a random user ID in each tab.
 
 1. Wait for both tabs to show **Connected**.
-2. Enter text and click **Insert at start**. Both tabs should show it.
-3. Click **Disconnect** in both tabs, then insert different text in each.
-4. Click **Connect** in both tabs. Both edits should appear in the same order
+2. Type directly in the document. Both tabs should show the edits and list each
+   other under **In this room**. Move the cursor or select text to see the other
+   participant's colored caret and selection. Hover over a caret to see its name.
+3. Try selecting, replacing, deleting, and pasting text. **Undo** and **Redo**
+   affect your own edits, including through Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
+4. Click **Disconnect** in both tabs, then type different text in each.
+5. Click **Connect** in both tabs. Both edits should appear in the same order
    in each tab. Either ordering of simultaneous inserts is valid.
-5. Wait for **Saved**, close both tabs, restart Phoenix, and open the same room
+6. Wait for **Saved**, close both tabs, restart Phoenix, and open the same room
    in a new tab. The saved text should be restored from PostgreSQL.
-6. Enter another **Room ID** and click **Open room**. That room should have its
+7. Enter another **Room ID** and click **Open room**. That room should have its
    own document. Open the same URL in another tab to collaborate in that room.
 
 Room IDs are case-sensitive, with 1 to 128 ASCII letters, digits, underscores
 or hyphens, starting with a letter or digit. For example,
 [`?room=design-notes`](http://127.0.0.1:5173/?room=design-notes) selects a room.
 Opening another room navigates to a new page. Reconnect and wait for **Saved**
-before switching if you want to keep local edits. **Delete first character**
-provides a small deletion operation for checking persistence as well as inserts.
+before switching if you want to keep local edits. The page asks before leaving
+with unconfirmed edits when the browser supports an unload prompt. This is a
+reminder, not offline storage. Keep the tab open until the edits are saved.
 
-The text area displays the shared result. The insert button provides a minimal
-editing operation for this protocol check. The example uses
+The editor uses [CodeMirror 6](https://codemirror.net/) and
+[`y-codemirror.next`](https://github.com/yjs/y-codemirror.next/tree/v0.3.6) to
+bind editing operations to the existing `doc.getText("content")`. Existing saved
+documents remain compatible. Its Yjs undo manager tracks local editor changes
+and leaves remote edits intact. Undo history lasts for this page visit only.
+The example uses
 [`y-phoenix-channel`](https://github.com/satoren/y-phoenix-channel/tree/main/npm/y-phoenix-channel)
 to exchange Yjs binary sync messages with `SynixirWeb.DocumentChannel` on
 `document:<room_id>`. Browser broadcast-channel sync is disabled so updates
 travel through Phoenix.
+
+Each visit gets a generated guest name and cursor color. The participant list
+counts connected browser sessions, not accounts. Names and cursor positions are
+temporary, client-supplied awareness data; they do not establish identity or room
+permissions. Awareness is scoped to the room, removed when the channel leaves,
+and announced again after reconnecting. Focusing another control clears the
+local cursor. Nothing in awareness is written to the document update log.
+
+**Connecting** means the initial sync is in progress. **Connected** means the
+channel has joined and synced. **Reconnecting** appears after a connection is
+lost, while **Disconnected** means you clicked Disconnect. Editing remains
+available offline, and its save status reports any unconfirmed changes.
 
 ## Room ownership and access
 
@@ -246,7 +268,10 @@ Playwright migrates the test database and starts its own Phoenix server on port
 your development servers can keep running on ports 4000 and 5173. Each test uses
 unique room IDs so saved data from previous runs does not affect the assertions.
 
-The browser tests check room isolation and concurrent offline edits. The
+The browser tests check room isolation, typing and selection replacement,
+multiline and Unicode edits, local undo/redo, remote selections following edits,
+participant departure and reconnect, and cancelling navigation with unsaved
+changes. They also check concurrent offline edits. The
 durability test waits for **Saved**, closes all original clients, kills its
 Phoenix process with `SIGKILL`, and recovers the text in a fresh browser context.
 It also covers a Unicode deletion and offline edits across another restart.
