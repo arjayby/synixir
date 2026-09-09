@@ -1,24 +1,27 @@
-defmodule SynixirWeb.DemoChannel do
+defmodule SynixirWeb.DocumentChannel do
   @moduledoc """
-  Exchanges binary Yjs sync messages with one in-memory Yex document.
+  Authorizes room joins and exchanges binary Yjs messages with their documents.
   """
 
   use SynixirWeb, :channel
 
+  alias Synixir.{Documents, RoomAccess}
   alias Yex.Sync.SharedDoc
 
   @impl true
-  def join("document:demo", _params, socket) do
-    case Process.whereis(Synixir.DemoDocument) do
-      nil ->
-        {:error, %{reason: "document_unavailable"}}
-
-      doc ->
-        :ok = SharedDoc.observe(doc)
-        monitor = Process.monitor(doc)
-        {:ok, assign(socket, doc: doc, doc_monitor: monitor)}
+  def join("document:" <> room_id, %{"token" => token}, socket) do
+    with {:ok, user_id} <- RoomAccess.verify(room_id, token),
+         {:ok, doc} <- Documents.open(room_id) do
+      :ok = SharedDoc.observe(doc)
+      monitor = Process.monitor(doc)
+      {:ok, assign(socket, doc: doc, doc_monitor: monitor, user_id: user_id)}
+    else
+      {:error, :unauthorized} -> {:error, %{reason: "unauthorized"}}
+      {:error, _reason} -> {:error, %{reason: "document_unavailable"}}
     end
   end
+
+  def join(_topic, _params, _socket), do: {:error, %{reason: "unauthorized"}}
 
   @impl true
   def handle_in(event, {:binary, message}, socket) when event in ["yjs_sync", "yjs"] do

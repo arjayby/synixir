@@ -1,5 +1,33 @@
 import { test, expect } from "@playwright/test";
 
+test("clients in different rooms keep their documents separate", async ({ browser, baseURL }) => {
+  const contexts = await Promise.all([browser.newContext(), browser.newContext()]);
+
+  try {
+    const [alpha, beta] = await Promise.all(contexts.map((context) => context.newPage()));
+    await Promise.all([
+      alpha.goto(`${baseURL}/?room=alpha`),
+      beta.goto(`${baseURL}/?room=beta`),
+    ]);
+    for (const page of [alpha, beta]) {
+      await expect(page.getByRole("status")).toHaveText("Connected");
+    }
+
+    await alpha.getByLabel("Text to insert").fill("Only alpha");
+    await alpha.getByRole("button", { name: "Insert at start" }).click();
+    await beta.getByLabel("Text to insert").fill("Only beta");
+    await beta.getByRole("button", { name: "Insert at start" }).click();
+
+    await Promise.all([alpha.reload(), beta.reload()]);
+    await expect(alpha.getByRole("status")).toHaveText("Connected");
+    await expect(beta.getByRole("status")).toHaveText("Connected");
+    await expect(alpha.getByLabel("Shared document")).toHaveValue("Only alpha");
+    await expect(beta.getByLabel("Shared document")).toHaveValue("Only beta");
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
+  }
+});
+
 test("independent clients merge concurrent text edits through Phoenix and Yex", async ({
   browser,
   baseURL,

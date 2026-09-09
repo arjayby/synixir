@@ -1,7 +1,7 @@
 defmodule SynixirWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :synixir
 
-  socket "/socket", SynixirWeb.DemoSocket,
+  socket "/socket", SynixirWeb.DocumentSocket,
     websocket: true,
     longpoll: false
 

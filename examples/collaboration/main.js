@@ -3,10 +3,14 @@ import { PhoenixChannelProvider } from "y-phoenix-channel";
 import * as Y from "yjs";
 import "./style.css";
 
+const roomId = new URL(window.location.href).searchParams.get("room") ?? "demo";
+const userId = crypto.randomUUID();
+document.querySelector("#room").value = roomId;
+
 const doc = new Y.Doc();
 const text = doc.getText("content");
 const socket = new Socket("/socket");
-const provider = new PhoenixChannelProvider(socket, "document:demo", doc, {
+const provider = new PhoenixChannelProvider(socket, `document:${roomId}`, doc, {
   connect: false,
   // Every update must go through Phoenix, including when using two local tabs.
   disableBc: true,
@@ -16,14 +20,45 @@ const status = document.querySelector("#status");
 const connection = document.querySelector("#connection");
 const output = document.querySelector("#document");
 const input = document.querySelector("#insert-text");
-let connected = true;
+let connected = false;
+let connectionError = "";
 
 function showStatus() {
-  status.textContent = !connected
+  status.textContent = connectionError || (!connected
     ? "Disconnected"
     : provider.synced
       ? "Connected"
-      : "Connecting";
+      : "Connecting");
+}
+
+async function connect() {
+  connected = true;
+  connectionError = "";
+  connection.disabled = true;
+  connection.textContent = "Disconnect";
+  showStatus();
+
+  try {
+    const response = await fetch("/api/demo/room-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room_id: roomId, user_id: userId }),
+    });
+    if (!response.ok) {
+      throw new Error(response.status === 422 ? "Invalid room ID" : "Demo access unavailable");
+    }
+    const { token } = await response.json();
+    provider.params.token = token;
+    socket.connect();
+    provider.connect();
+  } catch (error) {
+    connected = false;
+    connectionError = error.message;
+    connection.textContent = "Connect";
+    showStatus();
+  } finally {
+    connection.disabled = false;
+  }
 }
 
 provider.on("status", showStatus);
@@ -41,16 +76,15 @@ document.querySelector("#insert-form").addEventListener("submit", (event) => {
 });
 
 connection.addEventListener("click", () => {
-  connected = !connected;
   if (connected) {
-    socket.connect();
-    provider.connect();
-  } else {
+    connected = false;
     provider.disconnect();
     socket.disconnect();
+    connection.textContent = "Connect";
+    showStatus();
+  } else {
+    connect();
   }
-  connection.textContent = connected ? "Disconnect" : "Connect";
-  showStatus();
 });
 
 window.addEventListener("pagehide", () => {
@@ -59,5 +93,4 @@ window.addEventListener("pagehide", () => {
   doc.destroy();
 });
 
-socket.connect();
-provider.connect();
+connect();
