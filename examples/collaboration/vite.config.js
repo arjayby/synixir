@@ -6,7 +6,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api/demo": {
+      "/api": {
         target: process.env.SYNIXIR_ENDPOINT ?? "http://127.0.0.1:4000",
       },
       "/socket": {

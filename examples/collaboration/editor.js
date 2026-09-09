@@ -1,9 +1,16 @@
 import { EditorView, drawSelection, keymap, placeholder } from "@codemirror/view";
+import { Compartment, EditorState } from "@codemirror/state";
 import { defaultKeymap } from "@codemirror/commands";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 
 export function createEditor(text, awareness) {
+  let readOnly = true;
+  const permission = new Compartment();
+  // Yjs history commands bypass CodeMirror's readOnly state.
+  const historyKeymap = yUndoManagerKeymap.map(binding => ({
+    ...binding, run: view => readOnly || binding.run(view),
+  }));
   const undoManager = new Y.UndoManager(text, { trackedOrigins: new Set() });
   const undo = document.querySelector("#undo");
   const redo = document.querySelector("#redo");
@@ -11,11 +18,12 @@ export function createEditor(text, awareness) {
     doc: text.toString(),
     parent: document.querySelector("#editor"),
     extensions: [
+      permission.of(EditorState.readOnly.of(true)),
       // Use Yjs history so undo never removes another participant's edits.
-      keymap.of([...yUndoManagerKeymap, ...defaultKeymap]),
+      keymap.of([...historyKeymap, ...defaultKeymap]),
       drawSelection(),
       EditorView.lineWrapping,
-      placeholder("Start writing. Everyone in this room can edit here."),
+      placeholder("This document is empty."),
       EditorView.contentAttributes.of({
         "aria-label": "Shared document",
         "aria-describedby": "editor-help",
@@ -29,22 +37,28 @@ export function createEditor(text, awareness) {
   });
 
   function showHistory() {
-    undo.disabled = !undoManager.canUndo();
-    redo.disabled = !undoManager.canRedo();
+    undo.disabled = readOnly || !undoManager.canUndo();
+    redo.disabled = readOnly || !undoManager.canRedo();
   }
 
-  function undoEdit() { undoManager.undo(); editor.focus(); }
-  function redoEdit() { undoManager.redo(); editor.focus(); }
+  function undoEdit() { if (!readOnly) undoManager.undo(); editor.focus(); }
+  function redoEdit() { if (!readOnly) undoManager.redo(); editor.focus(); }
   undo.addEventListener("click", undoEdit);
   redo.addEventListener("click", redoEdit);
   undoManager.on("stack-item-added", showHistory);
   undoManager.on("stack-item-popped", showHistory);
   showHistory();
 
-  return () => {
+  const destroy = () => {
     undo.removeEventListener("click", undoEdit);
     redo.removeEventListener("click", redoEdit);
     editor.destroy();
     undoManager.destroy();
   };
+  destroy.setReadOnly = value => {
+    readOnly = value;
+    editor.dispatch({ effects: permission.reconfigure(EditorState.readOnly.of(value)) });
+    showHistory();
+  };
+  return destroy;
 }

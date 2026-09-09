@@ -7,12 +7,15 @@ log, and clients need a signed room access token to join. The browser example
 provides a shared plain text editor with live cursors, participant information,
 and recovery after a server crash.
 
-This implementation runs on one Phoenix node. Account authentication and a
-public client SDK are still planned.
+This implementation runs on one Phoenix node. Accounts, expiring sessions, and
+owner/editor/viewer room permissions are implemented. A public client SDK is
+still planned.
 
 ## Local setup
 
 - Elixir 1.18.3 and Erlang/OTP 27.3.3, pinned in `.tool-versions` for asdf.
+- A C compiler and `make` for Argon2 password hashing, such as the Xcode Command
+  Line Tools on macOS or build-essential on Ubuntu.
 - Hex and Rebar, installed once with `mix local.hex --force` and
   `mix local.rebar --force`.
 - Docker with Compose v2, through OrbStack or Docker Desktop.
@@ -37,7 +40,7 @@ versions in `.tool-versions`. Run the commands below from the project directory.
    mix setup
    ```
 
-   This creates `synixir_dev` and its document update and snapshot tables. For an existing
+   This creates `synixir_dev` and its document, account, session, and membership tables. For an existing
    checkout, run `mix ecto.migrate` after pulling new migrations.
 
 4. Run the checks below, then start Phoenix:
@@ -78,22 +81,28 @@ npm run dev
 
 If you manage Node.js another way, install the pinned version and skip the two
 `nvm` commands. Open [127.0.0.1:5173](http://127.0.0.1:5173) in two tabs.
-Both start in room `demo`. The example automatically requests a local demo
-token for a random user ID in each tab.
+Create an account with a public username and a password of 15–128 characters.
+Create a room from **Your rooms**. Its creator becomes the first owner.
 
-1. Wait for both tabs to show **Connected**.
-2. Type directly in the document. Both tabs should show the edits and list each
-   other under **In this room**. Move the cursor or select text to see the other
-   participant's colored caret and selection. Hover over a caret to see its name.
-3. Try selecting, replacing, deleting, and pasting text. **Undo** and **Redo**
-   affect your own edits, including through Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
-4. Click **Disconnect** in both tabs, then type different text in each.
-5. Click **Connect** in both tabs. Both edits should appear in the same order
-   in each tab. Either ordering of simultaneous inserts is valid.
-6. Wait for **Saved**, close both tabs, restart Phoenix, and open the same room
-   in a new tab. The saved text should be restored from PostgreSQL.
-7. Enter another **Room ID** and click **Open room**. That room should have its
-   own document. Open the same URL in another tab to collaborate in that room.
+1. Open the room in another tab signed into the same account, or create another
+   account in a separate browser profile.
+2. To add a different account, enter its username under **Manage access** and
+   choose **Editor**, **Viewer**, or **Owner**. Sharing the URL alone grants no
+   access. The other account must already exist.
+3. Owners and editors can type, select, replace, undo, and redo their own changes.
+   Viewers receive the document and presence but cannot edit. Their status reads
+   **View only** rather than claiming that they saved changes.
+4. Disconnect an editor, make an offline edit, and reconnect. Wait for **Saved**
+   before closing the tab. Offline edits survive only while the tab remains open.
+5. Restart Phoenix and open the same room to restore its saved state.
+6. Owners can change roles or remove members. Affected channels close and the
+   example requires a reload to obtain current permissions. Copy any unsaved
+   local draft before reloading. Revocation cannot erase text already received.
+
+Signing out invalidates the current session, closes its room channels, and
+clears document state in tabs sharing that browser session. Signing in as another
+account creates fresh editors and documents. Browser storage carries only a
+session-change notification, never credentials or document content.
 
 Room IDs are case-sensitive, with 1 to 128 ASCII letters, digits, underscores
 or hyphens, starting with a letter or digit. For example,
@@ -114,8 +123,9 @@ to exchange Yjs binary sync messages with `SynixirWeb.DocumentChannel` on
 `document:<room_id>`. Browser broadcast-channel sync is disabled so updates
 travel through Phoenix.
 
-Each visit gets a generated guest name and cursor color. The participant list
-counts connected browser sessions, not accounts. Names and cursor positions are
+Each account has a stable username; each editor visit gets a cursor color. The participant list
+counts connected editor visits, including multiple tabs for one account. Names
+and cursor positions are
 temporary, client-supplied awareness data; they do not establish identity or room
 permissions. Awareness is scoped to the room, removed when the channel leaves,
 and announced again after reconnecting. Focusing another control clears the
@@ -123,58 +133,123 @@ local cursor. Nothing in awareness is written to the document update log.
 
 **Connecting** means the initial sync is in progress. **Connected** means the
 channel has joined and synced. **Reconnecting** appears after a connection is
-lost, while **Disconnected** means you clicked Disconnect. Editing remains
-available offline, and its save status reports any unconfirmed changes.
+lost, while **Disconnected** means you clicked Disconnect. Owners and editors can
+keep editing offline, and the save status reports any unconfirmed changes.
 Rejected joins show **Access expired or denied** or **Room unavailable** and stop
-retrying that join. **Connect** requests a fresh demo token and retries without
+retrying that join. **Connect** requests a fresh authorized room token and retries without
 discarding local edits. Access requests and channel joins time out after 10 seconds.
+If the role changed while disconnected, reload with the new permissions after
+copying any unsaved draft. Reconnect also checks the current account before
+reusing a document and waits for the previous socket to finish closing.
 
-## Room ownership and access
+## Accounts and room permissions
 
-`Synixir.Documents.open/1` finds or starts a room's `Synixir.Documents.Document`
-process, using Yex with UTF-16 offsets matching JavaScript. A unique Registry name prevents
-concurrent callers from creating separate owners for the same room. A
-DynamicSupervisor supervises the document processes. If the Registry fails,
-the document supervisor also restarts so documents cannot outlive their lookup
-entries. Ownership is local to one Phoenix node.
+Accounts use stable UUIDs and unique, case-insensitive public usernames. Usernames
+contain 3–32 ASCII letters, digits, underscores or hyphens and start with a letter
+or digit. They are handles, not verified email addresses. Passwords use Argon2id
+with the package's production defaults; only tests reduce the hashing cost.
+Self-service password recovery, email verification, MFA, and external identity
+providers are outside this implementation.
 
-`SynixirWeb.DocumentChannel` verifies a room token before opening or observing
-the document. A grant allows reading and editing one room as its signed user
-ID. Missing, invalid, expired, or wrong-room tokens return an `unauthorized`
-join error. An unsigned `user_id` in the join payload cannot change identity.
+The browser stores an opaque random session token inside Phoenix's signed,
+HttpOnly, host-only session cookie. PostgreSQL stores its SHA-256 digest and a
+seven-day expiration. The cookie uses `SameSite=Lax` and `Secure` in production,
+which requires HTTPS. Login renews the cookie and rotates CSRF state; logout
+deletes the session before returning success. Every authenticated HTTP request
+looks up the session, and room operations check it again at their authorization
+boundary. Authentication attempts are limited to 20 per remote IP per minute in
+one node, before password hashing. This limiter uses the connection's remote IP;
+trusted proxy/IP configuration and broader quotas belong to production setup.
 
-Trusted server code issues tokens after checking the user's room permissions:
+All JSON API routes fetch the session and use CSRF protection. First fetch
+`GET /api/session`, retain its `csrf_token` in memory, and send it as
+`x-csrf-token` for state-changing requests. Retain the returned cookies. Responses
+use `Cache-Control: no-store`. Vite proxies `/api` and `/socket` to Phoenix;
+production should expose both through the application's HTTPS origin. WebSocket
+origin checks allow the configured frontend origins. Socket connections alone
+carry no identity: each room join must present an authorized bearer grant.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/session` | Current account or `null`, plus CSRF token |
+| `POST /api/accounts` | Register with `username` and `password`, then sign in |
+| `POST /api/session` | Sign in with `username` and `password` |
+| `DELETE /api/session` | Revoke the current session and sign out |
+| `GET /api/rooms` | List the account's active memberships |
+| `POST /api/rooms` | Create `room_id` and its initial owner atomically |
+| `POST /api/rooms/:room_id/token` | Issue a grant using current session and membership |
+| `GET /api/rooms/:room_id/members` | Owner-only membership list |
+| `PUT /api/rooms/:room_id/members/:username` | Owner grants or changes `role` |
+| `DELETE /api/rooms/:room_id/members/:username` | Owner revokes membership |
+
+Room endpoints return `{data: ...}` on success and `{error: ...}` on failure.
+Token responses contain `token`, `user_id`, `role`, and the session's `expires_at`.
+Client-supplied user IDs or roles cannot change the authenticated account.
+Membership management accepts only `owner`, `editor`, and `viewer`.
+
+| Permission | Owner | Editor | Viewer |
+|---|---|---|---|
+| Join and receive document/presence | Yes | Yes | Yes |
+| Publish valid ephemeral awareness | Yes | Yes | Yes |
+| Save document changes | Yes | Yes | No |
+| List and manage members | Yes | No | No |
+
+Each room has one membership per account, and at least one owner. Administration
+locks the room row so concurrent role changes cannot remove the final owner.
+Multiple owners are allowed. A membership version increments on every role
+change or revocation; re-adding an account never makes an old grant valid again.
+
+`Synixir.RoomAccess.issue(room_id, session_hash)` is a trusted server API. HTTP
+clients obtain grants through the authenticated token endpoint. Signed grants
+bind the room, account, session, and membership version. They expire for new
+joins after 15 minutes; existing channels remain subject to the underlying
+session expiration and current membership. Tokens from the old development
+issuer are invalid. The `/api/demo/room-token` route has been removed.
+
+Inside the document worker, an authorized update locks its session and room,
+checks current membership, applies Yex, and commits the raw update bytes in one
+transaction before replying **Saved**. Logout conflicts on the session lock;
+role changes conflict on the room lock. A write authorized first can finish
+before revocation commits. After revocation commits, queued or newly completed
+chunk uploads cannot write using stale access. Storage or commit failure stops
+the mutated worker before queued broadcasts run. Save telemetry also waits for
+that commit.
+
+Channels subscribe to session and membership notifications before observing a
+room and recheck access after observation. Durable revocation closes affected
+channels and discards incomplete transfers. Permission checks also run before
+accepting messages and before forwarding queued document or awareness data, so
+correctness does not depend on receiving a PubSub notification. Idle channels
+check session expiry every 30 seconds; messages always recheck current access.
+Data already sent over the network cannot be recalled.
+
+Viewers receive the server's sync response without a reverse upload request.
+Their client disables editing, undo/redo, and save tracking. The server rejects
+all update encodings with `read_only`, including raw saves, protocol updates,
+and reassembled transfers. UI controls are not an authorization boundary.
+
+### Existing documents and trusted server access
+
+`Synixir.Documents.open/1` still finds or starts the single supervised Yex process
+for a room, using UTF-16 offsets. Its direct `sync/2`, `save_update/2`, storage,
+and compaction functions are trusted server APIs. Browser channels use the
+separate authenticated path. Ownership remains local to one Phoenix node.
+
+Migrate the database before running the updated server, then restart it. Existing
+document logs and snapshots remain intact. They have no implicit owner: public
+room creation refuses IDs that already contain legacy data, preventing an account
+from claiming someone else's document. After the intended owner registers, an
+operator can adopt a specific document from trusted server code:
 
 ```elixir
-{:ok, token} = Synixir.RoomAccess.issue("design-notes", "user-123")
+user = Synixir.Repo.get_by!(Synixir.Accounts.User, username: "alice")
+{:ok, _room} = Synixir.RoomAccess.adopt_legacy_room("design-notes", user)
 ```
 
-Pass that token as a channel join parameter. With the browser provider:
-
-```js
-new PhoenixChannelProvider(socket, `document:${roomId}`, doc, {
-  params: { token },
-  disableBc: true,
-});
-```
-
-Tokens use [`Phoenix.Token`](https://phoenix.hexdocs.pm/Phoenix.Token.html)
-and the endpoint's secret key base. They are bearer credentials, signed but
-not encrypted, and valid for new joins for 15 minutes. Verification happens on
-every join, including reconnects. An existing joined channel remains authorized
-until it leaves or disconnects; expiry does not revoke an active session. There
-is no account system, membership database, role model, or revocation mechanism
-yet. Keep token issuance in trusted server code and use opaque user IDs.
-Phoenix filters `token` parameters from its logs.
-
-For local testing only, `POST /api/demo/room-token` accepts `room_id` and
-`user_id` and returns a token without checking permissions. The browser example
-calls it on startup and whenever **Connect** is clicked. The response uses
-`Cache-Control: no-store`. This route is compiled only when
-`:collaboration_demo` is enabled and also checks that setting at runtime.
-Development and test enable it; production defaults to disabled. Do not enable
-this unrestricted issuer in production. The document socket itself remains
-available with signed-token authorization.
+No documents are adopted automatically. The chosen owner can then grant other
+members access through the example or API. See the
+[authentication research](docs/research/authentication-permissions.md) for the
+library guidance and transaction design.
 
 ## Persistence and save acknowledgements
 
@@ -265,7 +340,8 @@ valid Yjs IDs and integer offsets. Other awareness fields remain available for
 application metadata. Awareness data still does not establish user identity.
 
 Channel failures return `{reason: "message_too_large"}`, `rate_limited`,
-`invalid_message`, `invalid_chunk`, `unsupported_message`, `storage_unavailable`, or
+`invalid_message`, `invalid_chunk`, `read_only`, `unauthorized`,
+`unsupported_message`, `storage_unavailable`, or
 `document_unavailable`. The example explains oversized edits, rejected updates,
 rate limits, and missing acknowledgements next to its save indicator. It keeps
 unconfirmed text in the tab. A transport limit closes the socket before channel
@@ -417,7 +493,9 @@ mix test
 `mix test` creates and migrates `synixir_test` before checking room ownership,
 authorization, save acknowledgements, recovery of pending updates, and database
 failure behavior. It also checks malformed and oversized payloads, message
-budgets, and telemetry outcomes. Lifecycle checks cover repeated compaction with
+budgets, and telemetry outcomes. Authentication checks cover CSRF, session expiry,
+role boundaries, legacy document ownership, queued writes and broadcasts after
+revocation, and logout concurrent with a real committing write. Lifecycle checks cover repeated compaction with
 pending dependencies and deletions, corrupt snapshots, idle observer races,
 chunk validation and expiry, and killing a compactor after its uncommitted
 snapshot write. The crash test uses real commits in a unique room and cleans up
@@ -451,10 +529,15 @@ Failure tests hold actual WebSocket save replies to verify acknowledgement
 ordering and timeout handling, reject grants on initial join and rejoin, and
 check that an oversized edit is neither shown as saved nor recovered by a new
 client. The backend still performs the real writes during reply-loss tests.
-Lifecycle browser tests exercise documents above 1 MiB, chunked broadcasts,
+Browser permission tests cover signup, owner management, read-only viewers, role
+changes while connected or offline, and clearing document state across logout and
+account changes, including cookie changes without a storage notification. The
+collaboration regression tests now provision real accounts and memberships through
+the public API. Lifecycle browser tests exercise documents above 1 MiB, chunked broadcasts,
 offline concurrent edits and deletions, snapshot recovery after `SIGKILL`,
 interrupted uploads, and missing final chunk acknowledgements. Transport tests send oversized frames and fragmented messages over a real
-WebSocket connection and check that both close with code 1009.
+WebSocket connection and check that both close with code 1009. They also verify
+that the WebSocket handshake rejects an untrusted browser origin.
 
 The [CI workflow](.github/workflows/ci.yml) runs these checks on pull requests
 and pushes to `main`. It uses the versions in `.tool-versions` and the same

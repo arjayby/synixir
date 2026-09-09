@@ -1,7 +1,5 @@
 import Config
 
-config :synixir, collaboration_demo: true
-
 # Configure your database
 config :synixir, Synixir.Repo,
   username: "postgres",
@@ -22,7 +20,7 @@ config :synixir, SynixirWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
-  check_origin: false,
+  check_origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "MEslinl75GenO9yKkNOWpe8KLeD88P3UlyiKjYd2VwkKbiabXb9m+8lpixLFKW9a",

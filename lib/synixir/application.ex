@@ -10,6 +10,7 @@ defmodule Synixir.Application do
     children = [
       SynixirWeb.Telemetry,
       Synixir.Repo,
+      Synixir.AuthRateLimit,
       {DNSCluster, query: Application.get_env(:synixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Synixir.PubSub},
       Synixir.Documents.Supervisor,

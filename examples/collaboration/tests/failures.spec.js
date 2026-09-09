@@ -1,3 +1,4 @@
+import { openRoom } from "./access-helpers.js";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.js";
 import { editor, expectText, insertAtStart, connected } from "./editor-helpers.js";
@@ -39,7 +40,7 @@ test("missing save acknowledgements never show Saved and reconnect confirms the 
       client.send(message);
     });
   });
-  await page.goto(`${baseURL}/?room=lost-ack-${randomUUID()}`);
+  await openRoom(page, `${baseURL}/?room=lost-ack-${randomUUID()}`);
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   holdReplies = true;
@@ -66,7 +67,7 @@ test("missing save acknowledgements never show Saved and reconnect confirms the 
 test("rejected access stops retrying the old grant and keeps local edits for a fresh join", async ({ page, baseURL, backend }) => {
   let reject = true;
   let requests = 0;
-  await page.route("**/api/demo/room-token", async route => {
+  await page.route("**/api/rooms/*/token", async route => {
     requests++;
     const response = await route.fetch();
     await route.fulfill({ response });
@@ -84,7 +85,7 @@ test("rejected access stops retrying the old grant and keeps local edits for a f
       server.send(message);
     });
   });
-  await page.goto(`${baseURL}/?room=access-retry-${randomUUID()}`);
+  await openRoom(page, `${baseURL}/?room=access-retry-${randomUUID()}`);
   await expect(page.locator("#status")).toHaveText("Access expired or denied");
   await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
   await insertAtStart(page, "Keep my local draft");
@@ -124,7 +125,7 @@ test("a client without chunk support still rejects oversized messages", async ({
     });
   });
   const url = `${baseURL}/?room=oversized-${randomUUID()}`;
-  await page.goto(url);
+  await openRoom(page, url);
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await editor(page).click();
@@ -133,7 +134,7 @@ test("a client without chunk support still rejects oversized messages", async ({
   await expect(page.locator("#save-help")).toContainText("exceeds the transfer limit");
   await page.close();
   const reader = await context.newPage();
-  await reader.goto(url);
+  await openRoom(reader, url);
   await connected(reader);
   await expectText(reader, "");
 });

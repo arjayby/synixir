@@ -1,7 +1,7 @@
 defmodule SynixirWeb.DocumentHardeningTest do
   use Synixir.DataCase, async: false
   import Phoenix.ChannelTest
-  alias Synixir.{Documents, RoomAccess}
+  alias Synixir.Documents
   alias SynixirWeb.DocumentSocket
   @endpoint SynixirWeb.Endpoint
 
@@ -86,7 +86,7 @@ defmodule SynixirWeb.DocumentHardeningTest do
 
     on_exit(fn -> Application.put_env(:synixir, :collaboration_limits, previous) end)
     {room_id, writer} = join_room()
-    {:ok, token} = RoomAccess.issue(room_id, "reader")
+    {:ok, token} = issue_room_grant(room_id, "reader")
     {:ok, socket} = connect(DocumentSocket, %{})
     {:ok, _, reader} = subscribe_and_join(socket, "document:#{room_id}", %{"token" => token})
 
@@ -165,7 +165,7 @@ defmodule SynixirWeb.DocumentHardeningTest do
 
   defp join_room do
     room_id = "hardening-#{Ecto.UUID.generate()}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
     {:ok, _, joined} = subscribe_and_join(socket, "document:#{room_id}", %{"token" => token})
     {room_id, joined}

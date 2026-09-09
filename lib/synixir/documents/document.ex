@@ -27,7 +27,86 @@ defmodule Synixir.Documents.Document do
   end
 
   @impl true
-  def handle_call({:validated, message}, {origin, _tag}, state) do
+  def handle_call(
+        {:authorized, _message, %{room_id: room}},
+        _from,
+        %{assigns: %{doc_name: document}} = state
+      )
+      when room != document do
+    {:reply, {:error, :unauthorized}, state}
+  end
+
+  def handle_call({:authorized, {:update, update}, grant}, {origin, _tag}, state) do
+    case Store.append_authorized(state.assigns.doc_name, update, grant, fn ->
+           Sync.read_sync_step2(update, state.doc, origin)
+         end) do
+      :ok ->
+        state =
+          assign(state,
+            log_updates: state.assigns.log_updates + 1,
+            log_bytes: state.assigns.log_bytes + byte_size(update)
+          )
+
+        {:reply, {:ok, [], true}, state |> reset_idle() |> schedule_compaction()}
+
+      {:error, reason} when reason in [:unauthorized, :read_only] ->
+        {:reply, {:error, reason}, state}
+
+      {:error, _} ->
+        {:stop, :storage_unavailable, {:error, :storage_unavailable}, state}
+    end
+  rescue
+    _ -> {:stop, :storage_unavailable, {:error, :storage_unavailable}, state}
+  end
+
+  def handle_call({:authorized, message, grant}, from, state) do
+    result =
+      Synixir.RoomAccess.with_access(grant, :read, fn %{role: role} ->
+        case handle_message(message, from, state, role) do
+          {:stop, _, _, _} = failure -> Synixir.Repo.rollback({:document_failed, failure})
+          reply -> reply
+        end
+      end)
+
+    case result do
+      {:ok, reply} ->
+        reply
+
+      {:error, {:document_failed, failure}} ->
+        failure
+
+      {:error, reason} when reason in [:unauthorized, :read_only] ->
+        {:reply, {:error, reason}, state}
+
+      {:error, _} ->
+        {:stop, :storage_unavailable, {:error, :storage_unavailable}, state}
+    end
+  rescue
+    _ -> {:stop, :storage_unavailable, {:error, :storage_unavailable}, state}
+  end
+
+  # Trusted server API. Browser traffic must use the authorized callback above.
+  def handle_call({:validated, message}, from, state),
+    do: handle_message(message, from, state, "owner")
+
+  def handle_call(:compact, _from, state) do
+    {result, state} = compact(state)
+    {:reply, result, state}
+  end
+
+  def handle_call({:observe, _client} = message, from, state) do
+    {:reply, :ok, state} = SharedDoc.handle_call(message, from, state)
+    {:reply, :ok, reset_idle(state)}
+  end
+
+  def handle_call({:unobserve, _client} = message, from, state) do
+    {:reply, :ok, state, _timeout} = SharedDoc.handle_call(message, from, state)
+    {:reply, :ok, reset_idle(state)}
+  end
+
+  def handle_call(message, from, state), do: SharedDoc.handle_call(message, from, state)
+
+  defp handle_message(message, {origin, _tag}, state, role) do
     state = reset_idle(state)
 
     case message do
@@ -37,7 +116,8 @@ defmodule Synixir.Documents.Document do
       {:sync_step1, vector} ->
         with {:ok, response} <- Sync.get_sync_step2(state.doc, vector),
              {:ok, request} <- Sync.get_sync_step1(state.doc) do
-          replies = Enum.map([response, request], &Sync.message_encode!({:sync, &1}))
+          replies = if role == "viewer", do: [response], else: [response, request]
+          replies = Enum.map(replies, &Sync.message_encode!({:sync, &1}))
           {:reply, {:ok, replies ++ awareness_messages(state), false}, state}
         else
           _ -> {:reply, {:error, :invalid_message}, state}
@@ -56,23 +136,6 @@ defmodule Synixir.Documents.Document do
         {:reply, {:error, :invalid_message}, state}
     end
   end
-
-  def handle_call(:compact, _from, state) do
-    {result, state} = compact(state)
-    {:reply, result, state}
-  end
-
-  def handle_call({:observe, _client} = message, from, state) do
-    {:reply, :ok, state} = SharedDoc.handle_call(message, from, state)
-    {:reply, :ok, reset_idle(state)}
-  end
-
-  def handle_call({:unobserve, _client} = message, from, state) do
-    {:reply, :ok, state, _timeout} = SharedDoc.handle_call(message, from, state)
-    {:reply, :ok, reset_idle(state)}
-  end
-
-  def handle_call(message, from, state), do: SharedDoc.handle_call(message, from, state)
 
   defp save(update, origin, state) do
     case Sync.read_sync_step2(update, state.doc, origin) do
