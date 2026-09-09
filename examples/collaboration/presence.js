@@ -1,7 +1,7 @@
 const colors = ["#3565b0", "#9a4626", "#7a4daa", "#26735b", "#aa3864", "#74601b"];
 
-export function showParticipants(provider, username) {
-  const awareness = provider.awareness;
+export function showParticipants(room, username) {
+  const awareness = room.awareness;
   const list = document.querySelector("#participants");
   const count = document.querySelector("#participant-count");
   const color = colors[awareness.clientID % colors.length];
@@ -10,7 +10,7 @@ export function showParticipants(provider, username) {
   document.querySelector("#your-name").textContent = name;
 
   function render() {
-    const online = provider.shouldConnect && provider.synced && provider.channel?.state === "joined";
+    const online = room.state.connection === "connected";
     const participants = [...awareness.getStates()]
       .filter(([id, state]) => state.user && (online || id === awareness.clientID))
       .sort(([a], [b]) => a === awareness.clientID ? -1 : b === awareness.clientID ? 1 : a - b);
@@ -35,21 +35,11 @@ export function showParticipants(provider, username) {
     if (count.textContent !== countLabel) count.textContent = countLabel;
   }
 
-  function synced(value) {
-    // Disconnect removes this client at its last awareness clock. Advance the
-    // clock on every rejoin so peers accept the returning state immediately.
-    if (value) awareness.setLocalState(awareness.getLocalState());
-    render();
-  }
-
   awareness.on("change", render);
-  provider.on("status", render);
-  provider.on("sync", synced);
-  render();
+  const unsubscribe = room.subscribe(render);
 
   return () => {
     awareness.off("change", render);
-    provider.off("status", render);
-    provider.off("sync", synced);
+    unsubscribe();
   };
 }

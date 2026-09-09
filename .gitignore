@@ -24,3 +24,7 @@ erl_crash.dump
 
 # Ignore package tarball (built via "mix hex.build").
 synixir-*.tar
+
+# JavaScript workspaces and local package checks.
+node_modules/
+*.tgz

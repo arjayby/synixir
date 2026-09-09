@@ -1,8 +1,4 @@
-import { Socket } from "phoenix";
-import { PhoenixChannelProvider } from "y-phoenix-channel";
-import * as Y from "yjs";
-import { chunkedSocket } from "./chunked-transport.js";
-import { trackSaveStatus } from "./save-status.js";
+import { SynixirRoom } from "@synixir/client";
 import { createEditor } from "./editor.js";
 import { showParticipants } from "./presence.js";
 import "./style.css";
@@ -112,19 +108,11 @@ function startCollaboration(user) {
   document.querySelector("#room").value = roomId;
   document.querySelector("#document-title").textContent = roomId;
 
-  const doc = new Y.Doc();
-  const text = doc.getText("content");
-  const socket = new Socket("/socket");
-  const provider = new PhoenixChannelProvider(chunkedSocket(socket), `document:${roomId}`, doc, {
-    connect: false,
-    // Every update must go through Phoenix, including when using two local tabs.
-    disableBc: true,
-  });
-
+  const room = new SynixirRoom({ roomId, userId: user.id });
   const status = document.querySelector("#status");
   const connection = document.querySelector("#connection");
-  const stopParticipants = showParticipants(provider, user.username);
-  const destroyEditor = createEditor(text, provider.awareness);
+  const stopParticipants = showParticipants(room, user.username);
+  const destroyEditor = createEditor(room.doc.getText("content"), room.awareness);
   let unsaved = false;
   const saveErrors = {
     message_too_large: "This update exceeds the transfer limit. Copy your text before leaving and use a smaller document.",
@@ -142,125 +130,59 @@ function startCollaboration(user) {
       : unsaved ? "Keep this tab open until Saved appears. Offline edits stay in this tab until you reconnect."
         : "Saved edits stay in this room after everyone leaves.";
   }
-  let stopSaveStatus = () => {};
-  let tracking = false;
-  let role;
-  let frozen = false;
-  let connected = false;
-  let connectionError = "";
-  let hasConnected = false;
-  let transportStatus = "connecting";
+  const saveLabels = { "not-saved": "Not saved", saving: "Saving", saved: "Saved",
+    unsaved: "Unsaved changes", failed: "Save failed", "view-only": "View only" };
+  const connectionLabels = { connected: "Connected", connecting: "Connecting",
+    reconnecting: "Reconnecting", disconnected: "Disconnected" };
   let disposed = false;
-  let socketClosed = Promise.resolve();
-
-  function disconnect() {
-    provider.disconnect();
-    socketClosed = socketClosed.then(() => new Promise(resolve => socket.disconnect(resolve)));
-  }
-
-  function showStatus() {
-    const synced = transportStatus === "connected" && provider.synced;
-    status.textContent = connectionError || (!connected ? "Disconnected"
-      : synced ? "Connected" : hasConnected ? "Reconnecting" : "Connecting");
-    status.dataset.state = connectionError ? "error" : !connected ? "disconnected" : synced ? "connected" : "connecting";
-    if (connected && synced) hasConnected = true;
-  }
-
-  async function connect() {
-    connected = true;
-    connectionError = "";
-    transportStatus = "connecting";
-    connection.disabled = true;
-    connection.textContent = "Disconnect";
-    showStatus();
-
-    try {
-      const session = await api("/api/session");
-      if (disposed || frozen) return;
-      if (session.user?.id !== user.id) {
-        clearCollaboration();
-        window.location.reload();
-        return;
-      }
-      const { data } = await api(`/api/rooms/${encodeURIComponent(roomId)}/token`, { method: "POST" });
-      if (disposed || frozen) return;
-      if (data.user_id !== user.id) {
-        clearCollaboration();
-        window.location.reload();
-        return;
-      }
-      if (role && role !== data.role) {
-        await revokeAccess();
-        return;
-      }
-      const { token } = data;
-      role = data.role;
-      destroyEditor.setReadOnly(role === "viewer");
-      document.querySelector("#role-label").textContent = role;
-      if (role !== "viewer" && !tracking) {
-        stopSaveStatus = trackSaveStatus(doc, provider, renderSave);
-        tracking = true;
-      }
-      if (role === "viewer") renderSave("View only");
-      document.querySelector("#members-panel").hidden = role !== "owner";
-      if (role === "owner") void loadMembers();
-      // Wait for Phoenix's old close callbacks before installing a new socket.
-      await socketClosed;
-      if (disposed || frozen) return;
-      provider.params.token = token;
-      socket.connect();
-      provider.connect();
-      const channel = provider.channel;
-      const rejectJoin = (message) => {
-        if (provider.channel !== channel || disposed) return;
-        connected = false;
-        connectionError = message;
-        disconnect();
-        connection.textContent = "Connect";
-        showStatus();
-      };
-      channel.on("access_revoked", revokeAccess);
-      channel.on("sync_error", () => rejectJoin("Document sync failed. Keep this tab open."));
-      // Phoenix reuses joinPush on automatic rejoin. Surface a rejected grant
-      // instead of retrying the same expired token indefinitely.
-      channel.joinPush.receive("error", ({ reason }) => rejectJoin(reason === "unauthorized"
-        ? "Access expired or denied" : "Room unavailable"));
-      channel.joinPush.receive("timeout", () => rejectJoin("Connection timed out"));
-    } catch (error) {
-      if (disposed) return;
-      connected = false;
-      connectionError = error.name === "TimeoutError" ? "Access request timed out" : explain(error);
-      connection.textContent = "Connect";
-      showStatus();
-    } finally {
-      connection.disabled = false;
+  let previousRole;
+  let checkedRevocation = false;
+  let stopState = () => {};
+  stopState = room.subscribe(state => {
+    if (disposed) return;
+    renderSave(saveLabels[state.saveStatus], state.saveError);
+    unsaved = state.hasUnsavedChanges;
+    destroyEditor.setReadOnly(state.readOnly);
+    document.querySelector("#role-label").textContent = state.role ?? "";
+    document.querySelector("#members-panel").hidden = state.role !== "owner";
+    if (state.role === "owner" && previousRole !== state.role) void loadMembers();
+    previousRole = state.role;
+    const frozen = ["access_changed", "account_changed"].includes(state.error?.code);
+    const active = ["connecting", "connected", "reconnecting"].includes(state.connection);
+    connection.textContent = frozen ? "Reload" : active ? "Disconnect" : "Connect";
+    connection.disabled = false;
+    status.textContent = connectionLabels[state.connection] ??
+      (frozen ? "Access changed. Reload to check permissions."
+        : state.error?.code === "unauthorized" ? "Access expired or denied"
+          : state.error?.code === "timeout" ? "Connection timed out"
+            : "Document sync failed. Keep this tab open.");
+    status.dataset.state = state.connection === "error" ? "error"
+      : state.connection === "connected" ? "connected" : active ? "connecting" : "disconnected";
+    if (state.error?.code === "account_changed") {
+      clearCollaboration();
+      window.location.reload();
+    } else if (frozen && !checkedRevocation) {
+      checkedRevocation = true;
+      void checkRevokedSession();
     }
-  }
+  });
 
-  provider.on("status", ({ status }) => { transportStatus = status; showStatus(); });
-  provider.on("sync", () => { showStatus(); if (role === "viewer") renderSave("View only"); });
-
+  // Connection errors are rendered by the subscription. Network failures also
+  // recover automatically; the button permits explicit disconnect/retry.
+  function connect() { void room.connect().catch(() => {}); }
   connection.addEventListener("click", () => {
-    if (frozen) return window.location.reload();
-    if (connected) {
-      connected = false;
-      disconnect();
-      connection.textContent = "Connect";
-      showStatus();
-    } else {
-      connect();
-    }
+    if (["access_changed", "account_changed"].includes(room.state.error?.code)) return window.location.reload();
+    if (["connecting", "connected", "reconnecting"].includes(room.state.connection)) void room.disconnect();
+    else connect();
   });
 
   function dispose() {
     if (disposed) return;
     disposed = true;
-    stopSaveStatus();
+    stopState();
     stopParticipants();
     destroyEditor();
-    provider.destroy();
-    socket.disconnect();
-    doc.destroy();
+    void room.destroy();
   }
   window.addEventListener("pagehide", dispose);
   clearCollaboration = () => {
@@ -272,22 +194,14 @@ function startCollaboration(user) {
   };
   hasUnsavedChanges = () => unsaved;
 
-  async function revokeAccess() {
-    frozen = true;
-    connected = false;
-    connectionError = "Access changed. Reload to check permissions.";
-    destroyEditor.setReadOnly(true);
-    disconnect();
-    connection.textContent = "Reload";
-    connection.disabled = false;
-    showStatus();
+  async function checkRevokedSession() {
     try {
       const session = await api("/api/session");
       if (session.user?.id !== user.id) {
         clearCollaboration();
         window.location.reload();
       }
-    } catch { /* Access is already closed; keep the local draft available to copy. */ }
+    } catch { /* Keep the revoked draft available to copy. */ }
   }
 
   async function loadMembers() {

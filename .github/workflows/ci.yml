@@ -59,12 +59,16 @@ jobs:
         with:
           node-version-file: examples/collaboration/.nvmrc
 
-      - name: Install browser example dependencies
-        working-directory: examples/collaboration
+      - name: Install JavaScript workspace dependencies
         run: npm ci
 
-      - name: Build the browser example
-        working-directory: examples/collaboration
+      - name: Test the client SDK
+        run: npm test
+
+      - name: Verify the packed client SDK
+        run: npm run test:package
+
+      - name: Build the browser examples
         run: npm run build
 
       - name: Install Chromium

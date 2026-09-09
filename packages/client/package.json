@@ -1,0 +1,19 @@
+{
+  "name": "@synixir/client",
+  "version": "0.1.0",
+  "description": "Synixir room synchronization, awareness, durable save status, and recovery for Yjs applications",
+  "type": "module",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": { "types": "./index.d.ts", "import": "./src/index.js", "default": "./src/index.js" }
+  },
+  "files": ["src", "index.d.ts", "README.md"],
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": {
+    "phoenix": "1.8.13",
+    "y-phoenix-channel": "0.3.0",
+    "y-protocols": "1.0.7"
+  },
+  "peerDependencies": { "yjs": "^13.6.32" },
+  "devDependencies": { "yjs": "13.6.32" }
+}

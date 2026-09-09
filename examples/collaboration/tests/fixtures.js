@@ -8,6 +8,14 @@ const env = { ...process.env, MIX_ENV: "test", PHX_SERVER: "true", PORT: "4010",
 const endpoint = "http://127.0.0.1:4010/robots.txt";
 
 export const test = base.extend({
+  pageErrors: [async ({ context }, use) => {
+    const errors = [];
+    const listen = page => page.on("pageerror", error => errors.push(error.message));
+    context.pages().forEach(listen);
+    context.on("page", listen);
+    await use();
+    expect(errors, "Unhandled browser errors").toEqual([]);
+  }, { auto: true }],
   backend: [async ({}, use) => {
     execFileSync("mix", ["ecto.create", "--quiet"], { cwd, env });
     execFileSync("mix", ["ecto.migrate", "--quiet"], { cwd, env });

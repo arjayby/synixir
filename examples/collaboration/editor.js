@@ -56,6 +56,7 @@ export function createEditor(text, awareness) {
     undoManager.destroy();
   };
   destroy.setReadOnly = value => {
+    if (readOnly === value) return;
     readOnly = value;
     editor.dispatch({ effects: permission.reconfigure(EditorState.readOnly.of(value)) });
     showHistory();

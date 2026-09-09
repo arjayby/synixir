@@ -64,7 +64,7 @@ test("missing save acknowledgements never show Saved and reconnect confirms the 
   await expectText(page, "Second edit. First edit");
 });
 
-test("rejected access stops retrying the old grant and keeps local edits for a fresh join", async ({ page, baseURL, backend }) => {
+test("reconnect fetches fresh access and rejected joins retain local edits", async ({ page, baseURL, backend }) => {
   let reject = true;
   let requests = 0;
   await page.route("**/api/rooms/*/token", async route => {
@@ -101,13 +101,14 @@ test("rejected access stops retrying the old grant and keeps local edits for a f
   await expect(page.locator("#status")).toHaveText("Access expired or denied");
   await insertAtStart(page, "After reconnect. ");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
-  expect(requests).toBe(2);
+  expect(requests).toBe(3);
   reject = false;
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await page.reload();
   await expectText(page, "After reconnect. Keep my local draft");
+  expect(requests).toBe(5); // Manual retry and the final page reload both fetch new grants.
 });
 
 test("a client without chunk support still rejects oversized messages", async ({ page, context, baseURL }) => {

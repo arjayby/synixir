@@ -8,8 +8,9 @@ provides a shared plain text editor with live cursors, participant information,
 and recovery after a server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
-owner/editor/viewer room permissions are implemented. A public client SDK is
-still planned.
+owner/editor/viewer room permissions are implemented. The browser SDK lives in
+[`@synixir/client`](packages/client/README.md), with JavaScript sources and
+TypeScript declarations. It is not yet published to npm.
 
 ## Local setup
 
@@ -75,8 +76,9 @@ In a second terminal:
 cd examples/collaboration
 nvm install
 nvm use
+cd ../..
 npm ci
-npm run dev
+npm run dev --workspace synixir-collaboration-example
 ```
 
 If you manage Node.js another way, install the pinned version and skip the two
@@ -117,11 +119,19 @@ The editor uses [CodeMirror 6](https://codemirror.net/) and
 bind editing operations to the existing `doc.getText("content")`. Existing saved
 documents remain compatible. Its Yjs undo manager tracks local editor changes
 and leaves remote edits intact. Undo history lasts for this page visit only.
-The example uses
+The example consumes `@synixir/client` through its document, awareness, lifecycle
+methods, and state subscription. The SDK uses
 [`y-phoenix-channel`](https://github.com/satoren/y-phoenix-channel/tree/main/npm/y-phoenix-channel)
-to exchange Yjs binary sync messages with `SynixirWeb.DocumentChannel` on
-`document:<room_id>`. Browser broadcast-channel sync is disabled so updates
-travel through Phoenix.
+internally to exchange Yjs binary sync messages with `SynixirWeb.DocumentChannel`
+on `document:<room_id>`. Browser broadcast-channel sync is disabled so updates
+travel through Phoenix. The SDK owns fresh access grants, recovery, chunked
+transfers, and save tracking; account forms and editor controls stay in the app.
+
+See the [SDK interface and integration guide](packages/client/README.md) for
+installation, connection and save states, cancellation, cleanup, and custom
+access callbacks. `/sdk.html?room=<room_id>` provides a second small consumer
+that synchronizes a title in a Y.Map without CodeMirror. It uses the same signed-in
+account and room membership as the editor.
 
 Each account has a stable username; each editor visit gets a cursor color. The participant list
 counts connected editor visits, including multiple tabs for one account. Names
@@ -133,7 +143,8 @@ local cursor. Nothing in awareness is written to the document update log.
 
 **Connecting** means the initial sync is in progress. **Connected** means the
 channel has joined and synced. **Reconnecting** appears after a connection is
-lost, while **Disconnected** means you clicked Disconnect. Owners and editors can
+lost. Each automatic reconnect fetches a fresh grant and creates a fresh channel.
+**Disconnected** means you clicked Disconnect. Owners and editors can
 keep editing offline, and the save status reports any unconfirmed changes.
 Rejected joins show **Access expired or denied** or **Room unavailable** and stop
 retrying that join. **Connect** requests a fresh authorized room token and retries without
@@ -297,7 +308,7 @@ channel.push("save_update", update.slice().buffer)
   .receive("timeout", () => { /* outcome unknown; retrying is safe */ });
 ```
 
-The example sends incremental updates through this save path and a full update
+The SDK sends incremental updates through this save path and a full update
 when it reconnects. Its chunk transport adapter splits large uploads, handshake
 responses, and server broadcasts into bounded messages. Only the final chunk
 can confirm a durable save. Duplicate delivery through the standard provider is
@@ -359,8 +370,8 @@ an explicitly configured higher cap with sufficient server and browser memory.
 
 A client opts in with `chunked_sync: 1` in its authorized join parameters. The
 join reply includes `transfer` with `max_message_bytes`, `chunk_bytes`,
-`max_transfer_bytes`, and `transfer_timeout_ms`. The example's
-[chunked-transport.js](examples/collaboration/chunked-transport.js) wraps the
+`max_transfer_bytes`, and `transfer_timeout_ms`. The SDK's internal
+[chunked-transport.js](packages/client/src/chunked-transport.js) wraps the
 existing Phoenix channel provider. Clients without this option keep the original
 protocol and per-message size limit.
 
@@ -502,15 +513,25 @@ snapshot write. The crash test uses real commits in a unique room and cleans up
 only that room's data. PostgreSQL is required. Test partitions append
 `MIX_TEST_PARTITION` to the test database name.
 
-Run the browser interoperability test separately after installing its Node.js
-dependencies:
+Install JavaScript dependencies from the root workspace lockfile, then check the
+SDK and both browser examples:
 
 ```sh
+npm ci
+npm test
+npm run test:package
+npm run build
 cd examples/collaboration
 npx playwright install --only-shell chromium
 npm test
-npm run build
 ```
+
+The SDK unit tests cover lifecycle cancellation, stale access callbacks, account
+boundaries, and subscriptions through its public entry point. The package check
+installs a real npm tarball into an isolated consumer and verifies ESM imports,
+shared Yjs identity, TypeScript NodeNext/bundler declarations, and a Vite build.
+It does not publish the package. Run browser tests separately from `mix test`;
+both use `synixir_test`.
 
 Playwright migrates the test database and starts its own Phoenix server on port
 4010 and Vite on port 5174, then shuts them down. Those ports must be free;
@@ -522,7 +543,10 @@ check that open rooms release database connections between operations so new
 accounts can still register. Failed tests also print the recent Phoenix server
 log to make HTTP and channel failures diagnosable in CI.
 
-The browser tests check room isolation, typing and selection replacement,
+Browser tests fail on unhandled page exceptions. SDK-specific browser checks
+cover synchronization before save acknowledgement, a shared Y.Map consumer,
+fresh-grant recovery, overlapping disconnect/connect, destruction, and suppression
+of programmatic viewer writes. The browser tests also check room isolation, typing and selection replacement,
 multiline and Unicode edits, local undo/redo, remote selections following edits,
 participant departure and reconnect, and cancelling navigation with unsaved
 changes. They also check concurrent offline edits. The
