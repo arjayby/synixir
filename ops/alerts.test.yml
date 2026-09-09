@@ -1,0 +1,47 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 15s
+tests:
+  - name: Dependency outage remains visible when metrics still respond
+    interval: 15s
+    input_series:
+      - series: 'up{job="synixir",instance="test"}'
+        values: '1+0x12'
+      - series: 'synixir_ready{job="synixir",instance="test"}'
+        values: '0+0x12'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SynixirNotReady
+        exp_alerts:
+          - exp_labels: {job: synixir, instance: test, severity: critical}
+            exp_annotations:
+              summary: Synixir database or collaboration processes are unavailable
+      - eval_time: 2m
+        alertname: SynixirScrapeUnavailable
+        exp_alerts: []
+  - name: Quota and permission denials do not page as storage failure
+    interval: 15s
+    input_series:
+      - series: 'synixir_document_save_total{job="synixir",instance="test",result="storage_quota"}'
+        values: '0+1x12'
+      - series: 'synixir_document_save_total{job="synixir",instance="test",result="read_only"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SynixirStorageFailures
+        exp_alerts: []
+  - name: Real storage errors page and clear after the five minute window
+    interval: 1m
+    input_series:
+      - series: 'synixir_document_restore_total{job="synixir",instance="test",result="storage_unavailable"}'
+        values: '0 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SynixirStorageFailures
+        exp_alerts:
+          - exp_labels: {job: synixir, instance: test, severity: critical}
+            exp_annotations:
+              summary: Synixir failed to save, restore or compact a document
+      - eval_time: 7m
+        alertname: SynixirStorageFailures
+        exp_alerts: []

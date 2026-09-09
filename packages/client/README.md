@@ -111,6 +111,15 @@ transfer bounds, queues large transfers with backpressure, and acknowledges only
 completed uploads. A state beyond the server's transfer cap requires a smaller
 document or a server configuration change.
 
+`saveError: "storage_quota"` means the room has reached its retained-byte limit.
+The SDK keeps the draft unconfirmed. Keep the page open or copy the draft, ask
+an operator to compact retained updates or increase the limit, then reconnect.
+Deleting text also creates CRDT history and does not necessarily free storage.
+Join errors `node_channel_quota`, `room_channel_quota`, `account_channel_quota`
+and `document_quota` stop that connection attempt. Call `connect()` after capacity
+is available; the instance retains local edits. See the
+[operations guide](../../docs/operations.md) for quota scope and recovery.
+
 There is no disk/IndexedDB persistence. Closing or reloading the page loses
 unconfirmed changes. The SDK never installs unload handlers or prompts; the
 application decides how to warn and when to discard a draft.

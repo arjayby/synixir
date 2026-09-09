@@ -23,6 +23,44 @@ end
 config :synixir, SynixirWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+for {key, variable} <- [
+      channels_per_node: "SYNIXIR_CHANNELS_PER_NODE",
+      channels_per_room: "SYNIXIR_CHANNELS_PER_ROOM",
+      channels_per_account: "SYNIXIR_CHANNELS_PER_ACCOUNT",
+      active_documents: "SYNIXIR_ACTIVE_DOCUMENTS",
+      rooms_per_account: "SYNIXIR_ROOMS_PER_ACCOUNT",
+      stored_bytes_per_room: "SYNIXIR_STORED_BYTES_PER_ROOM"
+    ] do
+  if raw = System.get_env(variable) do
+    value = String.to_integer(raw)
+    if value <= 0, do: raise("#{variable} must be a positive integer")
+    config :synixir, :quotas, [{key, value}]
+  end
+end
+
+metrics_token = System.get_env("SYNIXIR_METRICS_TOKEN")
+
+if metrics_token && byte_size(metrics_token) < 32,
+  do: raise("SYNIXIR_METRICS_TOKEN must contain at least 32 bytes")
+
+config :synixir, :metrics_token, metrics_token
+
+# Operations fixtures must never fall back to the ordinary test database.
+if database = System.get_env("SYNIXIR_OPERATIONS_DATABASE") do
+  unless config_env() == :test and
+           Regex.match?(~r/\Asynixir_(load|drill|restore)_[a-f0-9]{12}\z/, database),
+         do: raise("Operations require MIX_ENV=test and an isolated database name")
+
+  config :synixir, Synixir.Repo,
+    database: database,
+    hostname: System.get_env("PGHOST", "localhost"),
+    port: String.to_integer(System.get_env("PGPORT", "5432")),
+    username: System.get_env("PGUSER", "postgres"),
+    password: System.get_env("PGPASSWORD", "postgres"),
+    pool: DBConnection.ConnectionPool,
+    pool_size: 10
+end
+
 if config_env() == :test and System.get_env("SYNIXIR_BROWSER_TEST") == "true" do
   # Browser tests use committed data across independent processes. Sandbox
   # retains connections for long-lived channels and documents, exhausting the

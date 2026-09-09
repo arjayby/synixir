@@ -1,0 +1,21 @@
+{
+  "updates": 2,
+  "users": 5,
+  "rooms_verified": 5,
+  "migrations": [
+    20260909130000,
+    20260909160000,
+    20260909170000
+  ],
+  "snapshots": 3,
+  "passwords_sessions_roles": true,
+  "revocation": true,
+  "snapshot_tail": true,
+  "pending_insert_and_delete": true,
+  "sequences_and_constraints": true,
+  "restore_and_check_seconds": 1.406,
+  "archive_bytes": 14289,
+  "recorded_at": "2026-09-09T15:33:02.274152+00:00",
+  "backup_tool": "pg_dump (PostgreSQL) 17.11 (Debian 17.11-1.pgdg12+2)",
+  "isolated_limits_checks": true
+}

@@ -107,6 +107,11 @@ defmodule Synixir.RoomAccess do
   defp create_owned_room(room, id, legacy?) do
     Repo.query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [room])
 
+    if Repo.exists?(from r in "rooms", where: r.id == ^room),
+      do: Repo.rollback(:room_unavailable)
+
+    ensure_owner_capacity(id)
+
     if not legacy? and
          (Repo.exists?(from u in "document_updates", where: u.room_id == ^room) or
             Repo.exists?(from s in "document_snapshots", where: s.room_id == ^room)) do
@@ -179,6 +184,10 @@ defmodule Synixir.RoomAccess do
         if is_nil(user), do: Repo.rollback(:account_not_found)
         current = membership(room, user.id)
 
+        if role == "owner" and
+             not match?(%{revoked_at: nil, role: "owner"}, current),
+           do: ensure_owner_capacity(user.id)
+
         if current && current.revoked_at == nil && current.role == "owner" && role != "owner" do
           owners =
             Repo.aggregate(
@@ -227,6 +236,26 @@ defmodule Synixir.RoomAccess do
   end
 
   def set_member(_, _, _, _), do: {:error, :invalid_role}
+
+  defp ensure_owner_capacity(id) do
+    # Serialize creations and owner promotions across all sessions for this
+    # account. The namespace differs from the document transaction lock.
+    Repo.query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))", [id])
+    binary_id = Ecto.UUID.dump!(id)
+
+    owned =
+      Repo.aggregate(
+        from(m in "room_memberships",
+          where: m.user_id == ^binary_id and m.role == "owner" and is_nil(m.revoked_at)
+        ),
+        :count
+      )
+
+    if owned >= Application.fetch_env!(:synixir, :quotas)[:rooms_per_account] do
+      :telemetry.execute([:synixir, :quota, :rejected], %{count: 1}, %{reason: :room_quota})
+      Repo.rollback(:room_quota)
+    end
+  end
 
   def member_topic(room, user_id), do: "membership:" <> room <> ":" <> user_id
 end

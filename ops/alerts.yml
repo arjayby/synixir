@@ -1,0 +1,51 @@
+groups:
+  - name: synixir
+    rules:
+      - alert: SynixirScrapeUnavailable
+        expr: up{job="synixir"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Synixir metrics cannot be scraped
+      - alert: SynixirNotReady
+        expr: synixir_ready{job="synixir"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: Synixir database or collaboration processes are unavailable
+      - alert: SynixirStorageFailures
+        expr: sum by (job, instance) (increase({__name__=~"synixir_document_(save|restore|compact)_total", job="synixir", result="storage_unavailable"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Synixir failed to save, restore or compact a document
+      - alert: SynixirCapacityNearLimit
+        expr: (synixir_channels_active{job="synixir"} / synixir_channel_limit{job="synixir"} > 0.9) or (synixir_documents_active{job="synixir"} / synixir_document_limit{job="synixir"} > 0.9)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Synixir has used over 90 percent of a node admission limit
+      - alert: SynixirQuotaRejections
+        expr: sum by (job, instance, reason) (increase(synixir_quota_rejections_total{job="synixir"}[5m])) >= 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Synixir repeatedly rejected work at a quota
+      - alert: SynixirSlowSaves
+        expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(synixir_document_save_duration_seconds_bucket{job="synixir", result="ok"}[5m]))) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Synixir server save duration p95 exceeds 250 milliseconds
+      - alert: SynixirDatabaseQueue
+        expr: (rate(synixir_database_queue_seconds_sum{job="synixir"}[5m]) / rate(synixir_database_queue_seconds_count{job="synixir"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Synixir database checkout waits average over 50 milliseconds

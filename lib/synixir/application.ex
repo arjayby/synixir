@@ -10,11 +10,11 @@ defmodule Synixir.Application do
     children = [
       SynixirWeb.Telemetry,
       Synixir.Repo,
+      {Task.Supervisor, name: Synixir.HealthTasks, max_children: 4},
       Synixir.AuthRateLimit,
       {DNSCluster, query: Application.get_env(:synixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Synixir.PubSub},
-      Synixir.Documents.Supervisor,
-      SynixirWeb.Endpoint
+      Synixir.CollaborationSupervisor
     ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html

@@ -12,6 +12,11 @@ owner/editor/viewer room permissions are implemented. The browser SDK lives in
 [`@synixir/client`](packages/client/README.md), with JavaScript sources and
 TypeScript declarations. It is not yet published to npm.
 
+Step 10 adds admission and storage quotas, health endpoints, protected Prometheus
+metrics, alert examples, an SDK load runner, and database backup/restore checks.
+See the [operations guide](docs/operations.md) for limits, commands and measured
+results. Deployment and wiring external monitoring/backups are the next milestone.
+
 ## Local setup
 
 - Elixir 1.18.3 and Erlang/OTP 27.3.3, pinned in `.tool-versions` for asdf.
@@ -170,7 +175,8 @@ deletes the session before returning success. Every authenticated HTTP request
 looks up the session, and room operations check it again at their authorization
 boundary. Authentication attempts are limited to 20 per remote IP per minute in
 one node, before password hashing. This limiter uses the connection's remote IP;
-trusted proxy/IP configuration and broader quotas belong to production setup.
+trusted proxy/IP configuration belongs to deployment setup. Room and channel
+quotas are described in the [operations guide](docs/operations.md).
 
 All JSON API routes fetch the session and use CSRF protection. First fetch
 `GET /api/session`, retain its `csrf_token` in memory, and send it as
@@ -336,8 +342,10 @@ The defaults in `config/config.exs` are:
 The message budget includes updates, awareness, sync requests, and unsupported
 events. It refills over time; excess requests receive `rate_limited` without
 entering the document process. Another collaborator has a separate budget.
-Rejoining starts a new budget. These are per-channel controls, not account or
-IP quotas, and they do not bound the total number of connections or rooms.
+Rejoining starts a new budget. Separate admission quotas bound joined channels
+per account, room and node, along with resident documents and rooms owned by an
+account. Anonymous raw WebSockets and aggregate traffic per IP still need
+deployment gateway limits.
 
 Payload sizes and rate settings use the `:collaboration_limits` application
 configuration. The transport limits are configured separately in the endpoint
@@ -475,8 +483,12 @@ resulting snapshot size. Idle unloads increment a counter. Active
 documents are sampled every 10 seconds and include rooms with no participants.
 
 The new events contain no document content, tokens, room IDs, or user IDs. Labels
-use a fixed set of event names and outcomes. No metrics exporter or dashboard is
-installed. To inspect save outcomes locally in `iex -S mix phx.server`:
+use a fixed set of event names and outcomes. The Prometheus exporter uses a
+separate metric list in `Synixir.Operations.Metrics`, converts durations to seconds,
+and normalizes labels through finite allowlists. Enable `/metrics` with
+`SYNIXIR_METRICS_TOKEN`; health checks, alert rules and backup commands are in the
+[operations guide](docs/operations.md). No dashboard or alert receiver is installed.
+To inspect save outcomes locally in `iex -S mix phx.server`:
 
 ```elixir
 :telemetry.attach(

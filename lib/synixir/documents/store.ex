@@ -29,35 +29,42 @@ defmodule Synixir.Documents.Store do
     end)
   end
 
-  def append(room_id, update) do
-    measure(:save, %{bytes: byte_size(update), inserted: 0}, fn ->
-      inserted =
-        locked(room_id, fn ->
-          insert_update(room_id, update)
-        end)
+  def append(room_id, update), do: append_applied(room_id, update, fn -> :ok end)
 
-      {:ok, %{bytes: byte_size(update), inserted: inserted}}
+  def append_applied(room_id, update, apply_update) do
+    persist(room_id, update, apply_update, &Repo.transaction/1)
+  end
+
+  # Authorization, capacity check, live apply, and raw insert share a transaction.
+  # A quota rejection must happen before mutating the live document.
+  def append_authorized(room_id, update, grant, apply_update) do
+    persist(room_id, update, apply_update, fn fun ->
+      Synixir.RoomAccess.with_access(grant, :write, fn _ -> fun.() end)
     end)
   end
 
-  # The authorization locks, live apply, and raw insert share one transaction.
-  # Record a successful save only after that outer transaction commits.
-  def append_authorized(room_id, update, grant, apply_update) do
+  defp persist(room_id, update, apply_update, authorize) do
     started = System.monotonic_time()
 
     try do
       result =
-        Synixir.RoomAccess.with_access(grant, :write, fn _ ->
+        authorize.(fn ->
           locked(room_id, fn ->
-            :ok = apply_update.()
-            insert_update(room_id, update)
+            with :ok <- capacity(room_id, update) do
+              :ok = apply_update.()
+              {:ok, insert_update(room_id, update)}
+            end
           end)
         end)
 
       case result do
-        {:ok, inserted} ->
+        {:ok, {:ok, inserted}} ->
           record(:save, started, :ok, %{bytes: byte_size(update), inserted: inserted})
           :ok
+
+        {:ok, {:error, reason}} ->
+          record(:save, started, reason, %{bytes: byte_size(update), inserted: 0})
+          {:error, reason}
 
         {:error, reason} ->
           record(:save, started, reason, %{bytes: byte_size(update), inserted: 0})
@@ -67,6 +74,35 @@ defmodule Synixir.Documents.Store do
       error ->
         record(:save, started, :storage_unavailable, %{bytes: byte_size(update), inserted: 0})
         reraise error, __STACKTRACE__
+    end
+  end
+
+  defp capacity(room_id, update) do
+    digest = :crypto.hash(:sha256, update)
+
+    # Duplicate delivery consumes no additional log space, including a retry
+    # after a lost acknowledgement at the quota boundary.
+    if Repo.exists?(
+         from u in "document_updates", where: u.room_id == ^room_id and u.digest == ^digest
+       ) do
+      :ok
+    else
+      %{rows: [[stored]]} =
+        Repo.query!(
+          """
+          SELECT COALESCE((SELECT sum(octet_length(data)) FROM document_updates WHERE room_id = $1), 0)
+               + COALESCE((SELECT octet_length(data) FROM document_snapshots WHERE room_id = $1), 0)
+          """,
+          [room_id]
+        )
+
+      if stored + byte_size(update) <=
+           Application.fetch_env!(:synixir, :quotas)[:stored_bytes_per_room] do
+        :ok
+      else
+        :telemetry.execute([:synixir, :quota, :rejected], %{count: 1}, %{reason: :storage_quota})
+        {:error, :storage_quota}
+      end
     end
   end
 

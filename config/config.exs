@@ -27,6 +27,14 @@ config :synixir, :document_lifecycle,
 
 config :synixir, :authentication_limits, attempts: 20, window_ms: 60_000
 
+config :synixir, :quotas,
+  channels_per_node: 1000,
+  channels_per_room: 100,
+  channels_per_account: 20,
+  active_documents: 200,
+  rooms_per_account: 100,
+  stored_bytes_per_room: 268_435_456
+
 # Configure the endpoint
 config :synixir, SynixirWeb.Endpoint,
   url: [host: "localhost"],

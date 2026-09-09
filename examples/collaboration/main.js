@@ -29,6 +29,7 @@ function explain(error) {
     forbidden: "Only an owner can manage room access.",
     last_owner: "Add another owner before removing or changing the last owner.",
     room_unavailable: "That room ID is unavailable. Choose another.",
+    room_quota: "This account has reached its room ownership limit. Ask an operator to review the limit.",
     account_not_found: "No account has that username.",
   }[error.message] ?? "The request failed. Please try again.";
 }
@@ -115,6 +116,7 @@ function startCollaboration(user) {
   const destroyEditor = createEditor(room.doc.getText("content"), room.awareness);
   let unsaved = false;
   const saveErrors = {
+    storage_quota: "This room has reached its storage limit. Keep this tab open or copy your draft, and ask an operator for more space before retrying.",
     message_too_large: "This update exceeds the transfer limit. Copy your text before leaving and use a smaller document.",
     rate_limited: "Too many updates at once. Wait a moment, then disconnect and connect to retry. Keep this tab open.",
     invalid_message: "The server rejected this update. Copy your text before leaving this tab.",
@@ -134,6 +136,12 @@ function startCollaboration(user) {
     unsaved: "Unsaved changes", failed: "Save failed", "view-only": "View only" };
   const connectionLabels = { connected: "Connected", connecting: "Connecting",
     reconnecting: "Reconnecting", disconnected: "Disconnected" };
+  const connectionErrors = {
+    node_channel_quota: "The server has reached its connection limit. Keep your draft and try again later.",
+    room_channel_quota: "This room has reached its participant limit. Keep your draft and try again later.",
+    account_channel_quota: "Too many room tabs are open for this account. Disconnect another tab before retrying.",
+    document_quota: "The server has reached its active document limit. Keep your draft and try again later.",
+  };
   let disposed = false;
   let previousRole;
   let checkedRevocation = false;
@@ -155,7 +163,7 @@ function startCollaboration(user) {
       (frozen ? "Access changed. Reload to check permissions."
         : state.error?.code === "unauthorized" ? "Access expired or denied"
           : state.error?.code === "timeout" ? "Connection timed out"
-            : "Document sync failed. Keep this tab open.");
+            : connectionErrors[state.error?.code] ?? "Document sync failed. Keep this tab open.");
     status.dataset.state = state.connection === "error" ? "error"
       : state.connection === "connected" ? "connected" : active ? "connecting" : "disconnected";
     if (state.error?.code === "account_changed") {

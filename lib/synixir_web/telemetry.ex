@@ -9,6 +9,10 @@ defmodule SynixirWeb.Telemetry do
   @impl true
   def init(_arg) do
     children = [
+      {TelemetryMetricsPrometheus.Core,
+       name: :synixir_metrics,
+       metrics: Synixir.Operations.Metrics.definitions(),
+       start_async: false},
       # Telemetry poller will execute the given period measurements
       # every 10_000ms. Learn more here: https://telemetry-metrics.hexdocs.pm
       {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
@@ -109,7 +113,8 @@ defmodule SynixirWeb.Telemetry do
 
   defp periodic_measurements do
     [
-      {__MODULE__, :count_documents, []}
+      {__MODULE__, :count_documents, []},
+      {Synixir.Operations.Metrics, :sample, []}
     ]
   end
 

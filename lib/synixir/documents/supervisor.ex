@@ -11,7 +11,10 @@ defmodule Synixir.Documents.Supervisor do
   def init(_opts) do
     children = [
       {Registry, keys: :unique, name: Synixir.Documents.Registry},
-      {DynamicSupervisor, strategy: :one_for_one, name: Synixir.Documents.Workers}
+      {DynamicSupervisor,
+       strategy: :one_for_one,
+       name: Synixir.Documents.Workers,
+       max_children: Application.fetch_env!(:synixir, :quotas)[:active_documents]}
     ]
 
     # Losing the registry also restarts its documents, so no unregistered
