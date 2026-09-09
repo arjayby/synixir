@@ -1,0 +1,55 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #192b35;
+  background: #f4f6f7;
+}
+
+main {
+  max-width: 42rem;
+  margin: 3rem auto;
+  padding: 1.5rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+}
+
+label {
+  display: block;
+  margin: 1.5rem 0 0.5rem;
+  font-weight: 600;
+}
+
+input,
+textarea,
+button {
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.65rem;
+  border: 1px solid #71838c;
+  border-radius: 0.35rem;
+}
+
+input,
+textarea {
+  width: 100%;
+  background: white;
+  color: inherit;
+}
+
+button {
+  margin-top: 0.5rem;
+  background: #193f51;
+  color: white;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid #1887b8;
+  outline-offset: 3px;
+}
+
+.note {
+  font-size: 0.9rem;
+  color: #455d69;
+}

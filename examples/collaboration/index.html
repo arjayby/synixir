@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Synixir collaboration check</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main>
+      <h1>Synixir collaboration check</h1>
+      <p>Open this page in two tabs. Both connect to the same demo document.</p>
+      <p id="status" role="status">Connecting</p>
+      <button id="connection" type="button">Disconnect</button>
+
+      <form id="insert-form">
+        <label for="insert-text">Text to insert</label>
+        <input id="insert-text" autocomplete="off" maxlength="1000" required />
+        <button type="submit">Insert at start</button>
+      </form>
+
+      <label for="document">Shared document</label>
+      <textarea id="document" rows="8" readonly></textarea>
+      <p class="note">Memory only. Close all tabs and restart the backend to reset this document.</p>
+      <p class="note">Disconnect to make local edits, then connect again to merge them.</p>
+    </main>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

@@ -9,6 +9,7 @@ import Config
 
 config :synixir,
   ecto_repos: [Synixir.Repo],
+  collaboration_demo: false,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint

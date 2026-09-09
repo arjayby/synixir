@@ -1,5 +1,7 @@
 import Config
 
+config :synixir, collaboration_demo: true
+
 # Configure your database
 config :synixir, Synixir.Repo,
   username: "postgres",

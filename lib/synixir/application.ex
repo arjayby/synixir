@@ -7,21 +7,40 @@ defmodule Synixir.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      SynixirWeb.Telemetry,
-      Synixir.Repo,
-      {DNSCluster, query: Application.get_env(:synixir, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Synixir.PubSub},
-      # Start a worker by calling: Synixir.Worker.start_link(arg)
-      # {Synixir.Worker, arg},
-      # Start to serve requests, typically the last entry
-      SynixirWeb.Endpoint
-    ]
+    children =
+      [
+        SynixirWeb.Telemetry,
+        Synixir.Repo,
+        {DNSCluster, query: Application.get_env(:synixir, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Synixir.PubSub}
+      ] ++ demo_children() ++ [SynixirWeb.Endpoint]
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Synixir.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp demo_children do
+    if Application.get_env(:synixir, :collaboration_demo, false) do
+      [
+        %{
+          id: Synixir.DemoDocument,
+          start:
+            {Yex.Sync.SharedDoc, :start_link,
+             [
+               [
+                 doc_name: "demo",
+                 auto_exit: false,
+                 doc_option: %Yex.Doc.Options{offset_kind: :utf16}
+               ],
+               [name: Synixir.DemoDocument]
+             ]}
+        }
+      ]
+    else
+      []
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration
