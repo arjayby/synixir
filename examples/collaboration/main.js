@@ -1,6 +1,7 @@
 import { Socket } from "phoenix";
 import { PhoenixChannelProvider } from "y-phoenix-channel";
 import * as Y from "yjs";
+import { trackSaveStatus } from "./save-status.js";
 import "./style.css";
 
 const roomId = new URL(window.location.href).searchParams.get("room") ?? "demo";
@@ -20,6 +21,9 @@ const status = document.querySelector("#status");
 const connection = document.querySelector("#connection");
 const output = document.querySelector("#document");
 const input = document.querySelector("#insert-text");
+const stopSaveStatus = trackSaveStatus(doc, provider, (value) => {
+  document.querySelector("#save-status").textContent = value;
+});
 let connected = false;
 let connectionError = "";
 
@@ -75,6 +79,11 @@ document.querySelector("#insert-form").addEventListener("submit", (event) => {
   }
 });
 
+document.querySelector("#delete-first").addEventListener("click", () => {
+  const first = Array.from(text.toString())[0];
+  if (first) text.delete(0, first.length);
+});
+
 connection.addEventListener("click", () => {
   if (connected) {
     connected = false;
@@ -88,6 +97,7 @@ connection.addEventListener("click", () => {
 });
 
 window.addEventListener("pagehide", () => {
+  stopSaveStatus();
   provider.destroy();
   socket.disconnect();
   doc.destroy();

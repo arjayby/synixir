@@ -44,6 +44,10 @@ button {
   cursor: pointer;
 }
 
+#delete-first {
+  margin: 0 0 0.5rem;
+}
+
 :focus-visible {
   outline: 3px solid #1887b8;
   outline-offset: 3px;

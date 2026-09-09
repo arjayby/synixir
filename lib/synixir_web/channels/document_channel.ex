@@ -25,14 +25,26 @@ defmodule SynixirWeb.DocumentChannel do
 
   @impl true
   def handle_in(event, {:binary, message}, socket) when event in ["yjs_sync", "yjs"] do
-    case SharedDoc.send_yjs_message(socket.assigns.doc, message) do
-      :ok -> {:noreply, socket}
-      {:error, _reason} -> {:reply, {:error, %{reason: "invalid_message"}}, socket}
-    end
+    protocol_reply(Documents.sync(socket.assigns.doc, message), socket)
+  end
+
+  def handle_in("save_update", {:binary, update}, socket) do
+    protocol_reply(Documents.save_update(socket.assigns.doc, update), socket)
   end
 
   def handle_in(_event, _payload, socket) do
     {:reply, {:error, %{reason: "unsupported_message"}}, socket}
+  end
+
+  defp protocol_reply(result, socket) do
+    case result do
+      {:ok, messages, saved} ->
+        Enum.each(messages, &push(socket, "yjs", {:binary, &1}))
+        {:reply, {:ok, %{saved: saved}}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: Atom.to_string(reason)}}, socket}
+    end
   end
 
   @impl true

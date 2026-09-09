@@ -19,6 +19,7 @@
 
       <p class="note">Local demo access is granted automatically. No account is required here.</p>
       <p id="status" role="status">Connecting</p>
+      <p>Save status: <span id="save-status" aria-live="polite">Not saved</span></p>
       <button id="connection" type="button">Disconnect</button>
 
       <form id="insert-form">
@@ -28,8 +29,9 @@
       </form>
 
       <label for="document">Shared document</label>
+      <button id="delete-first" type="button">Delete first character</button>
       <textarea id="document" rows="8" readonly></textarea>
-      <p class="note">Memory only. Close all tabs and restart the backend to reset this document.</p>
+      <p class="note">Saved edits survive a backend restart. Use another room ID for a fresh document.</p>
       <p class="note">Disconnect to make local edits, then connect again to merge them.</p>
     </main>
     <script type="module" src="/main.js"></script>

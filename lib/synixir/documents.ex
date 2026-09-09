@@ -1,18 +1,21 @@
 defmodule Synixir.Documents do
   @moduledoc """
-  Finds or starts the single in-memory document process for a room on this node.
+  Finds or starts the single document process for a room on this node.
 
-  Documents remain alive when clients leave. A process or server restart loses
-  their state until persistence is implemented. Callers must authorize access
-  before opening a room on behalf of a client.
+  Documents remain alive when clients leave. Opening a stopped room restores
+  its committed updates from PostgreSQL before it can serve requests. Callers
+  must authorize access before opening a room on behalf of a client.
   """
 
   @spec open(String.t()) :: {:ok, pid()} | {:error, term()}
   def open(room_id) do
     if valid_room_id?(room_id) do
       case Registry.lookup(Synixir.Documents.Registry, room_id) do
-        [{pid, _}] -> {:ok, pid}
-        [] -> start_document(room_id)
+        [{pid, _}] ->
+          if Process.alive?(pid), do: {:ok, pid}, else: start_document(room_id)
+
+        [] ->
+          start_document(room_id)
       end
     else
       {:error, :invalid_room_id}
@@ -30,11 +33,26 @@ defmodule Synixir.Documents do
 
   def valid_room_id?(_room_id), do: false
 
+  @doc "Exchanges a Yjs protocol message. A saved reply follows a committed database write."
+  @spec sync(pid(), binary()) :: {:ok, [binary()], boolean()} | {:error, atom()}
+  def sync(doc, message), do: call(doc, {:sync, message})
+
+  @doc "Applies a binary Yjs update and acknowledges it only after PostgreSQL commits it."
+  @spec save_update(pid(), binary()) :: {:ok, [], true} | {:error, atom()}
+  def save_update(doc, update), do: call(doc, {:save_update, update})
+
+  defp call(doc, message) do
+    GenServer.call(doc, message, 15_000)
+  catch
+    :exit, _reason -> {:error, :document_unavailable}
+  end
+
   defp start_document(room_id) do
     child = %{
       id: room_id,
+      restart: :temporary,
       start:
-        {Yex.Sync.SharedDoc, :start_link,
+        {Synixir.Documents.Document, :start_link,
          [
            [
              doc_name: room_id,

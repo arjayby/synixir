@@ -1,5 +1,5 @@
 defmodule Synixir.DocumentsTest do
-  use ExUnit.Case, async: true
+  use Synixir.DataCase, async: false
 
   alias Synixir.Documents
 

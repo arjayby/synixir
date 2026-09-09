@@ -2,12 +2,12 @@
 
 Synixir is an Elixir/Phoenix collaboration backend in early development.
 It connects browser Yjs documents to supervised Yex processes through Phoenix
-Channels. Each room has its own in-memory document, and clients need a signed
-room access token to join. The browser example demonstrates room isolation and
-concurrent text edits converging after reconnecting.
+Channels. Each room has its own document process backed by a PostgreSQL update
+log, and clients need a signed room access token to join. The browser example
+demonstrates room isolation, concurrent edits, and recovery after a server crash.
 
-This implementation runs on one Phoenix node. PostgreSQL persistence, account
-authentication, an editor UI, and a public client SDK are still planned.
+This implementation runs on one Phoenix node. Account authentication, a full
+editor UI, and a public client SDK are still planned.
 
 ## Local setup
 
@@ -36,7 +36,8 @@ versions in `.tool-versions`. Run the commands below from the project directory.
    mix setup
    ```
 
-   This creates `synixir_dev` and runs the empty migration and seed steps.
+   This creates `synixir_dev` and its document update table. For an existing
+   checkout, run `mix ecto.migrate` after pulling new migrations.
 
 4. Run the checks below, then start Phoenix:
 
@@ -84,15 +85,17 @@ token for a random user ID in each tab.
 3. Click **Disconnect** in both tabs, then insert different text in each.
 4. Click **Connect** in both tabs. Both edits should appear in the same order
    in each tab. Either ordering of simultaneous inserts is valid.
-5. Close both tabs and open a new one. The backend should still have the text.
+5. Wait for **Saved**, close both tabs, restart Phoenix, and open the same room
+   in a new tab. The saved text should be restored from PostgreSQL.
 6. Enter another **Room ID** and click **Open room**. That room should have its
    own document. Open the same URL in another tab to collaborate in that room.
 
 Room IDs are case-sensitive, with 1 to 128 ASCII letters, digits, underscores
 or hyphens, starting with a letter or digit. For example,
 [`?room=design-notes`](http://127.0.0.1:5173/?room=design-notes) selects a room.
-Opening another room navigates to a new page; reconnect before switching if
-you want to send local edits first.
+Opening another room navigates to a new page. Reconnect and wait for **Saved**
+before switching if you want to keep local edits. **Delete first character**
+provides a small deletion operation for checking persistence as well as inserts.
 
 The text area displays the shared result. The insert button provides a minimal
 editing operation for this protocol check. The example uses
@@ -103,9 +106,8 @@ travel through Phoenix.
 
 ## Room ownership and access
 
-`Synixir.Documents.open/1` finds or starts a room's
-[`Yex.Sync.SharedDoc`](https://y-ex.hexdocs.pm/Yex.Sync.SharedDoc.html) process,
-with UTF-16 offsets matching JavaScript. A unique Registry name prevents
+`Synixir.Documents.open/1` finds or starts a room's `Synixir.Documents.Document`
+process, using Yex with UTF-16 offsets matching JavaScript. A unique Registry name prevents
 concurrent callers from creating separate owners for the same room. A
 DynamicSupervisor supervises the document processes. If the Registry fails,
 the document supervisor also restarts so documents cannot outlive their lookup
@@ -149,17 +151,68 @@ Development and test enable it; production defaults to disabled. Do not enable
 this unrestricted issuer in production. The document socket itself remains
 available with signed-token authorization.
 
+## Persistence and save acknowledgements
+
+The `document_updates` table stores incoming Yjs v1 update bytes, indexed by
+room and insertion order. A SHA-256 digest makes repeated delivery of identical
+bytes within a room a no-op in PostgreSQL. Room startup replays the log before
+accepting joins, and normal Yjs state-vector sync supplies missing changes to
+reconnecting clients.
+
+The room process validates and applies an update, commits its incoming bytes,
+then acknowledges the request and broadcasts the change. It stores incoming
+bytes even when Yex is waiting for a missing dependency. Saving only emitted
+document changes would lose those pending updates on a crash. A failed database
+write stops the modified in-memory process without a saved acknowledgement or
+broadcast. A load failure refuses the join instead of serving an empty document.
+
+`Synixir.Documents.Document` uses `Yex.DocServer` with synchronous requests for
+this ordering. It reuses `Yex.Sync.SharedDoc` callbacks for observers and
+awareness, but does not use its asynchronous update entry point or rely on a
+shutdown hook to save data. Awareness remains temporary and is not stored.
+
+The channel supports these messages:
+
+| Event | Binary payload | Successful reply |
+|---|---|---|
+| `yjs` or `yjs_sync` | A Yjs v1 sync or awareness message | `{saved: true}` for committed updates; `{saved: false}` for handshake or awareness messages |
+| `save_update` | A raw Yjs v1 document update | `{saved: true}` after the database write commits |
+
+Replies use Phoenix's `ok` or `error` status. `yjs` pushes still carry the
+standard binary sync messages expected by `y-phoenix-channel`. For example,
+an explicit save request is:
+
+```js
+channel.push("save_update", update.slice().buffer)
+  .receive("ok", ({ saved }) => { /* saved === true confirms durability */ })
+  .receive("error", () => { /* retain local changes and retry */ })
+  .receive("timeout", () => { /* outcome unknown; retrying is safe */ });
+```
+
+The example sends incremental updates through this save path and a full update
+when it reconnects. Duplicate delivery through the standard provider is safe.
+Its save tracker waits for acknowledgements covering every local edit, including
+deletions, and ignores late replies from old connections. **Connected** reports
+sync progress. **Saved** confirms database persistence; **Saving**, **Unsaved
+changes**, and **Save failed** do not. A timeout may mean the write committed
+but its reply was lost. Reconnect to retry and obtain confirmation.
+
 ## Document lifetime
 
 Documents are created on demand and remain in memory after all clients leave.
-They have no durable storage or idle eviction yet. A document crash loses its
-state and supervision starts a new empty process; other rooms keep running.
-Channels attached to the failed process close so clients can rejoin. A server
-restart clears every room. To reset, close all example tabs and restart Phoenix.
-An open client can send its local document back after a backend restart.
-Offline edits live only
-in that tab until they reach the backend; reloading an offline tab loses them.
-**Connected** indicates sync has completed, not that PostgreSQL saved the text.
+After a document crash or server restart, the next join opens a process and
+restores its committed updates. Channels attached to a failed process close so
+clients can rejoin. Document processes use temporary supervision to avoid an
+automatic restart loop during a database outage; other rooms keep running.
+
+Use a new room ID for a fresh document. Restarting Phoenix no longer resets
+saved content. Offline changes remain only in that tab until acknowledged as
+saved; closing or reloading an offline tab loses unsent edits. Existing content
+from the earlier memory-only implementation is not imported automatically.
+
+The update log is append-only. Compaction, snapshots, retention, idle eviction,
+and multi-node ownership are not implemented yet. Long-lived rooms will need
+compaction to control log growth and recovery time.
 
 Yex uses precompiled native binaries on supported platforms; the installed
 Elixir/OTP versions were checked on Apple Silicon without Rust.
@@ -173,10 +226,10 @@ mix format --check-formatted
 mix test
 ```
 
-`mix test` creates and migrates `synixir_test` before checking document ownership,
-room ID validation, channel authorization, the demo token endpoint, and JSON
-errors. PostgreSQL is required. Test partitions append `MIX_TEST_PARTITION` to
-the test database name.
+`mix test` creates and migrates `synixir_test` before checking room ownership,
+authorization, save acknowledgements, recovery of pending updates, and database
+failure behavior. PostgreSQL is required. Test partitions append
+`MIX_TEST_PARTITION` to the test database name.
 
 Run the browser interoperability test separately after installing its Node.js
 dependencies:
@@ -188,12 +241,16 @@ npm test
 npm run build
 ```
 
-Playwright starts its own Phoenix server on port 4010 and Vite on port 5174,
-then shuts them down. Those ports must be free; your development servers can
-keep running on ports 4000 and 5173. The tests use isolated browser contexts,
-check that separate rooms retain different text, make concurrent offline
-inserts including Unicode, reconnect both clients, and verify the merged
-document from a fresh client after the others close.
+Playwright migrates the test database and starts its own Phoenix server on port
+4010 and Vite on port 5174, then shuts them down. Those ports must be free;
+your development servers can keep running on ports 4000 and 5173. Each test uses
+unique room IDs so saved data from previous runs does not affect the assertions.
+
+The browser tests check room isolation and concurrent offline edits. The
+durability test waits for **Saved**, closes all original clients, kills its
+Phoenix process with `SIGKILL`, and recovers the text in a fresh browser context.
+It also covers a Unicode deletion and offline edits across another restart.
+This runs against real PostgreSQL commits, outside the ExUnit SQL sandbox.
 
 The [CI workflow](.github/workflows/ci.yml) runs these checks on pull requests
 and pushes to `main`. It uses the versions in `.tool-versions` and the same
