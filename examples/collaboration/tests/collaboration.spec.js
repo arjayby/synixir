@@ -55,7 +55,8 @@ test("editing and undo preserve another participant's changes", async ({ browser
     await alice.getByRole("button", { name: "Undo", exact: true }).click();
     await expectText(alice, " from Bob");
     await expectText(bob, " from Bob");
-    await editor(alice).press("ControlOrMeta+Shift+z");
+    // Playwright's character keys are case-sensitive, even with Shift held.
+    await editor(alice).press("ControlOrMeta+Shift+Z");
     await expectText(bob, "Hello from Bob");
 
     // Replace a selection, then insert multiple lines as a paste would.
