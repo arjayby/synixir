@@ -98,12 +98,31 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  public_url =
+    System.get_env("SYNIXIR_PUBLIC_URL") ||
+      raise("SYNIXIR_PUBLIC_URL is required, for example https://collaboration.example.com")
+
+  public =
+    case URI.new(public_url) do
+      {:ok, uri} -> uri
+      {:error, _} -> raise("SYNIXIR_PUBLIC_URL must be a valid HTTPS origin")
+    end
+
+  unless public.scheme == "https" and is_binary(public.host) and public.host != "" and
+           public.path in [nil, "", "/"] and is_nil(public.query) and is_nil(public.fragment) and
+           is_nil(public.userinfo) and public.port in 1..65_535,
+         do:
+           raise(
+             "SYNIXIR_PUBLIC_URL must be an HTTPS origin without credentials, path, query or fragment"
+           )
+
+  origin = URI.to_string(%{public | path: nil})
 
   config :synixir, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :synixir, SynixirWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: [host: public.host, port: public.port, scheme: "https"],
+    check_origin: [origin],
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

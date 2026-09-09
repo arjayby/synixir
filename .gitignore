@@ -28,3 +28,7 @@ synixir-*.tar
 # JavaScript workspaces and local package checks.
 node_modules/
 *.tgz
+
+# Local staging credentials, certificates, backups and reports.
+/.local/
+__pycache__/

@@ -1,0 +1,82 @@
+name: ${SYNIXIR_STAGE_PROJECT:?Initialize staging with scripts/staging.py init}
+
+x-release: &release
+  image: ${SYNIXIR_IMAGE:?Set the locally built release image}
+  environment:
+    DATABASE_URL: ecto://synixir:${SYNIXIR_DATABASE_PASSWORD:?Missing database password}@db/synixir
+    SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Missing session secret}
+    RELEASE_COOKIE: ${RELEASE_COOKIE:?Missing release cookie}
+    SYNIXIR_METRICS_TOKEN: ${SYNIXIR_METRICS_TOKEN:?Missing metrics token}
+    SYNIXIR_PUBLIC_URL: https://localhost:${SYNIXIR_STAGE_PORT:-8443}
+    POOL_SIZE: "10"
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Missing administrative database password}
+      SYNIXIR_DATABASE_PASSWORD: ${SYNIXIR_DATABASE_PASSWORD:?Missing application database password}
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./init-database.sql:/docker-entrypoint-initdb.d/10-synixir.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  migrate:
+    <<: *release
+    command: [/app/bin/synixir, eval, Synixir.Release.migrate()]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: "no"
+
+  app:
+    <<: *release
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "3", "http://127.0.0.1:4000/health/ready"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:1.30.4-trixie@sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c
+    ports:
+      - "127.0.0.1:${SYNIXIR_STAGE_PORT:-8443}:8443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${SYNIXIR_STAGE_DIR:?Missing staging directory}/localhost.crt:/etc/nginx/tls/localhost.crt:ro
+      - ${SYNIXIR_STAGE_DIR:?Missing staging directory}/localhost.key:/etc/nginx/tls/localhost.key:ro
+    depends_on:
+      app: {condition: service_healthy}
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.5@sha256:332c2f43e7e389d74d3893b55bb02fbbd684208e681eeb604641d5d769c0fe2a
+    # The bind-mounted configuration is mode 0600 on the host and contains the scrape token.
+    user: "${SYNIXIR_STAGE_UID:?Missing local uid}:${SYNIXIR_STAGE_GID:?Missing local gid}"
+    read_only: true
+    tmpfs: [/prometheus:mode=1777]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ${SYNIXIR_STAGE_DIR:?Missing staging directory}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../ops/alerts.yml:/etc/prometheus/alerts.yml:ro
+    depends_on:
+      app: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  database:

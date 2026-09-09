@@ -1,8 +1,9 @@
 # Operations
 
 Step 10 adds limits, probes, metrics, alert rules, load checks and verified database
-backups. Synixir still runs on one Phoenix node. Deployment, TLS, monitoring
-delivery and off-machine backup scheduling belong to step 11.
+backups. Synixir still runs on one Phoenix node. Step 11 adds
+[local Docker staging](deployment.md), HTTPS, a private collector and a release
+pilot. External alert delivery and off-machine backup scheduling remain unconfigured.
 
 ## Quotas
 
@@ -96,7 +97,8 @@ and can omit native allocations; monitor container/host memory and disk separate
 
 [prometheus.yml](../ops/prometheus.yml) is a collector example. Set its target,
 mount the token file and configure Alertmanager delivery in the deployment.
-The repository does not start a collector or send notifications.
+Local Docker staging starts a private collector with these rules. It does not
+send notifications; configure Alertmanager delivery before relying on paging.
 
 [alerts.yml](../ops/alerts.yml) detects an unavailable scrape, failed readiness,
 storage errors, admission above 90 percent, repeated quota refusals, save p95 over

@@ -2,16 +2,13 @@ import Config
 
 config :synixir, secure_session_cookie: true
 
-# Force using SSL in production. This also sets the "strict-security-transport" header,
-# known as HSTS. If you have a health check endpoint, you may want to exclude it below.
-# Note `:force_ssl` is required to be set at compile-time.
+# The app listener must be private to the HTTPS gateway, which overwrites the
+# forwarded scheme. Internal probes and authenticated scrapes use that private network.
 config :synixir, SynixirWeb.Endpoint,
   force_ssl: [
-    rewrite_on: [:x_forwarded_proto],
-    exclude: [
-      # paths: ["/health"],
-      hosts: ["localhost", "127.0.0.1"]
-    ]
+    rewrite_on: [:x_forwarded_proto, :x_forwarded_for],
+    host: {SynixirWeb.Endpoint, :public_authority, []},
+    exclude: [paths: ["/health/live", "/health/ready", "/metrics"]]
   ]
 
 # Do not print debug messages in production
