@@ -23,15 +23,34 @@ function receipt() {
   return result;
 }
 
-export function chunkedSocket(socket) {
+export function chunkedSocket(socket, writable) {
+  const cleanups = [];
   return {
     endPointURL: () => socket.endPointURL(),
-    channel: (topic, params) => adaptChannel(socket.channel(topic, { ...params, chunked_sync: 1 })),
+    channel: (topic, params) => adaptChannel(socket.channel(topic, { ...params, chunked_sync: 1 }), writable, cleanups),
+    destroy: () => cleanups.splice(0).forEach(cleanup => cleanup()),
   };
 }
 
-function adaptChannel(channel) {
+function adaptChannel(channel, writable, cleanups) {
   const push = channel.push.bind(channel);
+  const on = channel.on.bind(channel);
+  const off = channel.off.bind(channel);
+  const bindings = new Map();
+  let closed = false;
+  channel.on = (event, callback) => {
+    const ref = on(event, callback);
+    bindings.set(ref, event);
+    return ref;
+  };
+  channel.off = (event, ref) => {
+    // Phoenix removes each temporary reply handler when its push completes.
+    // Retaining those references would grow this registry on every edit.
+    for (const [key, name] of bindings) {
+      if (name === event && (ref === undefined || key === ref)) bindings.delete(key);
+    }
+    return off(event, ref);
+  };
   let limits;
   let generation = 0;
   let nextId = 0;
@@ -40,6 +59,7 @@ function adaptChannel(channel) {
   let running = false;
   let incoming;
   const pending = new Set();
+  const requests = new Set();
 
   function clearIncoming() {
     clearTimeout(incoming?.timer);
@@ -54,11 +74,21 @@ function adaptChannel(channel) {
     running = false;
     for (const result of pending) result.finish("error", { reason: "disconnected" });
     pending.clear();
+    for (const finish of requests) finish({ status: "error", value: { reason: "disconnected" } });
   }
+
+  cleanups.push(() => {
+    closed = true;
+    reset();
+    // Remove provider callbacks too: a late old-channel message must not apply
+    // updates or clear awareness belonging to the next connection.
+    for (const [ref, event] of bindings) channel.off(event, ref);
+  });
 
   channel.onError(reset);
   channel.onClose(reset);
   channel.joinPush.receive("ok", ({ transfer }) => {
+    if (closed) return;
     reset();
     limits = transfer;
   });
@@ -99,10 +129,12 @@ function adaptChannel(channel) {
 
   function request(event, buffer, timeout) {
     return new Promise(resolve => {
+      const finish = reply => { requests.delete(finish); resolve(reply); };
+      requests.add(finish);
       push(event, buffer, timeout)
-        .receive("ok", value => resolve({ status: "ok", value }))
-        .receive("error", value => resolve({ status: "error", value }))
-        .receive("timeout", () => resolve({ status: "timeout", value: {} }));
+        .receive("ok", value => finish({ status: "ok", value }))
+        .receive("error", value => finish({ status: "error", value }))
+        .receive("timeout", () => finish({ status: "timeout", value: {} }));
     });
   }
 
@@ -145,6 +177,14 @@ function adaptChannel(channel) {
   }
 
   channel.push = (event, buffer, timeout = 10_000) => {
+    const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : null;
+    const writes = event === "save_update" ||
+      (EVENTS.includes(event) && bytes?.[0] === 0 && [1, 2].includes(bytes[1]));
+    if (closed || (!writable && writes)) {
+      const result = receipt();
+      result.finish("error", { reason: closed ? "disconnected" : "read_only" });
+      return result;
+    }
     if (!EVENTS.includes(event) || !(buffer instanceof ArrayBuffer) ||
         !limits || buffer.byteLength <= limits.max_message_bytes) {
       const result = push(event, buffer, timeout);

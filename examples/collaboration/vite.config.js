@@ -1,6 +1,15 @@
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  build: {
+    rolldownOptions: {
+      input: {
+        collaboration: fileURLToPath(new URL("./index.html", import.meta.url)),
+        settings: fileURLToPath(new URL("./sdk.html", import.meta.url)),
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,

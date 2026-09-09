@@ -1,0 +1,14 @@
+{
+  "name": "synixir",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/client", "examples/collaboration"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "test": "npm test --workspace @synixir/client",
+    "test:package": "node scripts/check-client-package.js",
+    "test:browser": "npm test --workspace synixir-collaboration-example",
+    "build": "npm run build --workspace synixir-collaboration-example"
+  },
+  "devDependencies": { "typescript": "7.0.2" }
+}
