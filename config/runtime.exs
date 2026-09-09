@@ -23,6 +23,13 @@ end
 config :synixir, SynixirWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if config_env() == :test and System.get_env("SYNIXIR_BROWSER_TEST") == "true" do
+  # Browser tests use committed data across independent processes. Sandbox
+  # retains connections for long-lived channels and documents, exhausting the
+  # pool before later HTTP requests can run. Keep ExUnit's Sandbox separate.
+  config :synixir, Synixir.Repo, pool: DBConnection.ConnectionPool, pool_size: 4
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

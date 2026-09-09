@@ -516,6 +516,11 @@ Playwright migrates the test database and starts its own Phoenix server on port
 4010 and Vite on port 5174, then shuts them down. Those ports must be free;
 your development servers can keep running on ports 4000 and 5173. Each test uses
 unique room IDs so saved data from previous runs does not affect the assertions.
+The fixture sets `SYNIXIR_BROWSER_TEST=true` for its subprocesses, selecting a
+regular four-connection database pool. ExUnit keeps SQL Sandbox. Browser tests
+check that open rooms release database connections between operations so new
+accounts can still register. Failed tests also print the recent Phoenix server
+log to make HTTP and channel failures diagnosable in CI.
 
 The browser tests check room isolation, typing and selection replacement,
 multiline and Unicode edits, local undo/redo, remote selections following edits,
