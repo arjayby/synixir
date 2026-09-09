@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 
 const cwd = fileURLToPath(new URL("../../..", import.meta.url));
-const env = { ...process.env, MIX_ENV: "test", PHX_SERVER: "true", PORT: "4010" };
+const env = { ...process.env, MIX_ENV: "test", PHX_SERVER: "true", PORT: "4010", SYNIXIR_BROWSER_TEST: "true" };
 const endpoint = "http://127.0.0.1:4010/robots.txt";
 
 export const test = base.extend({
@@ -49,6 +49,7 @@ export const test = base.extend({
     try {
       await start();
       await use({
+        logs: () => output,
         restart: async () => { await stop(); await start(); },
         compact: room => {
           // Use the production store against committed test data. Pass the room
@@ -68,6 +69,12 @@ export const test = base.extend({
       await stop();
     }
   }, { scope: "worker", auto: true }],
+});
+
+test.afterEach(async ({ backend }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus && backend.logs()) {
+    console.error(`Phoenix test server output:\n${backend.logs()}`);
+  }
 });
 
 export { expect };

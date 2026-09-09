@@ -1,7 +1,7 @@
 defmodule SynixirWeb.ChunkTransferTest do
   use Synixir.DataCase, async: false
   import Phoenix.ChannelTest
-  alias Synixir.{Documents, RoomAccess}
+  alias Synixir.Documents
   alias SynixirWeb.{DocumentSocket, ChunkTransfer}
   @endpoint SynixirWeb.Endpoint
 
@@ -171,7 +171,7 @@ defmodule SynixirWeb.ChunkTransferTest do
     do: for(<<0, rest::binary>> <- ChunkTransfer.chunks(data, 1, 64), do: <<2, rest::binary>>)
 
   defp join_room(room \\ "chunk-#{Ecto.UUID.generate()}") do
-    {:ok, token} = RoomAccess.issue(room, "alice")
+    {:ok, token} = issue_room_grant(room, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
 
     {:ok, %{transfer: %{chunk_bytes: 64}}, joined} =

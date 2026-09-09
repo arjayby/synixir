@@ -1,11 +1,11 @@
 const colors = ["#3565b0", "#9a4626", "#7a4daa", "#26735b", "#aa3864", "#74601b"];
 
-export function showParticipants(provider, userId) {
+export function showParticipants(provider, username) {
   const awareness = provider.awareness;
   const list = document.querySelector("#participants");
   const count = document.querySelector("#participant-count");
   const color = colors[awareness.clientID % colors.length];
-  const name = `Guest ${userId.slice(0, 4)}`;
+  const name = username;
   awareness.setLocalStateField("user", { name, color, colorLight: `${color}26` });
   document.querySelector("#your-name").textContent = name;
 

@@ -3,14 +3,13 @@ defmodule SynixirWeb.DocumentChannelTest do
 
   import Phoenix.ChannelTest
 
-  alias Synixir.RoomAccess
   alias SynixirWeb.DocumentSocket
 
   @endpoint SynixirWeb.Endpoint
 
   test "a storage read failure refuses the join instead of serving an empty document" do
     room_id = "load-failed-#{Ecto.UUID.generate()}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
     Repo.query!("ALTER TABLE document_updates RENAME TO unavailable_document_updates")
 
@@ -21,7 +20,7 @@ defmodule SynixirWeb.DocumentChannelTest do
   @tag capture_log: true
   test "a rejected database write is neither acknowledged as saved nor broadcast" do
     room_id = "failed-#{Ecto.UUID.generate()}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
     {:ok, _, writer} = subscribe_and_join(socket, "document:#{room_id}", %{"token" => token})
     {:ok, _, reader} = subscribe_and_join(socket, "document:#{room_id}", %{"token" => token})
@@ -76,7 +75,7 @@ defmodule SynixirWeb.DocumentChannelTest do
 
   test "an acknowledged edit is recovered after the document process is killed" do
     room_id = "saved-#{Ecto.UUID.generate()}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
     {:ok, _, joined} = subscribe_and_join(socket, "document:#{room_id}", %{"token" => token})
 
@@ -107,7 +106,7 @@ defmodule SynixirWeb.DocumentChannelTest do
 
   test "missing, tampered, expired and invalid grants cannot join a room" do
     room_id = "denied-#{System.unique_integer([:positive])}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
 
     # A correctly signed but old grant tests expiry without waiting.
@@ -143,7 +142,7 @@ defmodule SynixirWeb.DocumentChannelTest do
 
   test "a room token authorizes its room and supplies the signed user identity" do
     room_id = "access-#{System.unique_integer([:positive])}"
-    {:ok, token} = RoomAccess.issue(room_id, "alice")
+    {:ok, token} = issue_room_grant(room_id, "alice")
     {:ok, socket} = connect(DocumentSocket, %{})
 
     assert {:ok, _, joined} =
@@ -152,7 +151,8 @@ defmodule SynixirWeb.DocumentChannelTest do
                "user_id" => "mallory"
              })
 
-    assert joined.assigns.user_id == "alice"
+    assert {:ok, _id} = Ecto.UUID.cast(joined.assigns.user_id)
+    assert joined.assigns.user_id != "mallory"
 
     assert {:error, %{reason: "unauthorized"}} =
              subscribe_and_join(socket, "document:another-room", %{"token" => token})

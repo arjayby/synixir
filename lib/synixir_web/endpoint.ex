@@ -12,7 +12,9 @@ defmodule SynixirWeb.Endpoint do
     store: :cookie,
     key: "_synixir_key",
     signing_salt: "i299Tait",
-    same_site: "Lax"
+    same_site: "Lax",
+    http_only: true,
+    secure: Application.compile_env(:synixir, :secure_session_cookie, false)
   ]
 
   # socket "/live", Phoenix.LiveView.Socket,
@@ -44,7 +46,8 @@ defmodule SynixirWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
-    json_decoder: Phoenix.json_library()
+    json_decoder: Phoenix.json_library(),
+    length: 16_384
 
   plug Plug.MethodOverride
   plug Plug.Head

@@ -44,6 +44,7 @@ defmodule Synixir.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:postgrex, ">= 0.0.0"},
       {:y_ex, "~> 0.10.5"},
+      {:argon2_elixir, "~> 4.1"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},

@@ -89,3 +89,24 @@ label { display: block; font-size: 12px; margin-bottom: 7px; }
 @media (prefers-reduced-motion: reduce) {
   #editor .cm-ySelectionInfo, #editor .cm-ySelectionCaretDot { transition: none; }
 }
+
+[hidden] { display: none !important; }
+.account-panel { max-width: 520px; margin: 40px auto; }
+.account-panel p { line-height: 1.6; }
+.account-panel form { display: grid; gap: 12px; margin-top: 24px; }
+.account-panel label { margin: 0; }
+.account-bar, .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0; }
+.account-bar > span { min-width: 0; overflow-wrap: anywhere; }
+.account-bar button { flex-shrink: 0; white-space: nowrap; }
+#your-name { overflow-wrap: anywhere; }
+#account-error, #member-error { color: #a33b2b; font-size: 13px; }
+#room-list { padding-left: 20px; line-height: 2; }
+#members-list { list-style: none; padding: 0; font-size: 12px; }
+#members-list li { display: grid; gap: 7px; padding: 12px 0; border-bottom: 1px solid #d7ddd4; overflow-wrap: anywhere; }
+#member-form { display: grid; gap: 8px; }
+select { font: inherit; padding: 8px; border: 1px solid #b6c2b9; border-radius: 6px; background: white; }
+
+@media (max-width: 760px) {
+  #members-panel { grid-column: 1 / -1; }
+  .participant-name { flex: 1; }
+}

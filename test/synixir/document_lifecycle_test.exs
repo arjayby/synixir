@@ -115,7 +115,7 @@ defmodule Synixir.DocumentLifecycleTest do
     monitor = Process.monitor(owner)
     assert :ok = SharedDoc.unobserve(owner)
     assert_receive {:DOWN, ^monitor, :process, ^owner, :normal}, 500
-    assert Registry.lookup(Documents.Registry, room) == []
+    assert await_unregistered(room)
     {:ok, restored} = Documents.open(room)
     assert content(restored) == expected
     stop(restored)
@@ -149,6 +149,18 @@ defmodule Synixir.DocumentLifecycleTest do
     monitor = Process.monitor(owner)
     Process.exit(observer, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^owner, :normal}, 500
+  end
+
+  defp await_unregistered(room, attempts \\ 100)
+  defp await_unregistered(_room, 0), do: false
+
+  defp await_unregistered(room, attempts) do
+    if Registry.lookup(Documents.Registry, room) == [] do
+      true
+    else
+      Process.sleep(1)
+      await_unregistered(room, attempts - 1)
+    end
   end
 
   defp configure(options) do

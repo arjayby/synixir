@@ -1,3 +1,4 @@
+import { openRoom } from "./access-helpers.js";
 import { createHash, randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.js";
 import { connected, editor } from "./editor-helpers.js";
@@ -49,10 +50,10 @@ test("a document larger than one message survives offline edits, compaction and 
     const push = binaryPush(payload);
     if (push) largestPayload = Math.max(largestPayload, push.payload.length);
   }));
-  await page.goto(url);
+  await openRoom(page, url);
   await connected(page);
   const peer = await context.newPage();
-  await peer.goto(url);
+  await openRoom(peer, url);
   await connected(peer);
   await editor(page).click();
   await page.keyboard.insertText(content);
@@ -74,7 +75,7 @@ test("a document larger than one message survives offline edits, compaction and 
   await peer.close();
   await backend.restart();
   const reader = await context.newPage();
-  await reader.goto(url);
+  await openRoom(reader, url);
   await connected(reader);
   await expectDocument(reader, expected);
   await expect(reader.locator("#save-status")).toHaveText("Saved");
@@ -95,7 +96,7 @@ test("an interrupted chunk upload is never saved and reconnect retries the retai
       server.send(message);
     });
   });
-  await page.goto(url);
+  await openRoom(page, url);
   await connected(page);
   await editor(page).click();
   await page.keyboard.insertText(content);
@@ -103,7 +104,7 @@ test("an interrupted chunk upload is never saved and reconnect retries the retai
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(page.locator("#save-status")).not.toHaveText("Saved");
   const reader = await context.newPage();
-  await reader.goto(url);
+  await openRoom(reader, url);
   await connected(reader);
   await expectDocument(reader, "");
   interrupt = false;
@@ -139,7 +140,7 @@ test("a missing final chunk acknowledgement stays unconfirmed and stale replies 
       client.send(message);
     });
   });
-  await page.goto(url);
+  await openRoom(page, url);
   await connected(page);
   await editor(page).click();
   await page.keyboard.insertText(content);

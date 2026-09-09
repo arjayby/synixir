@@ -31,22 +31,38 @@ defmodule SynixirWeb.DocumentChannel do
   end
 
   defp authorize_and_observe("document:" <> room_id, %{"token" => token} = params, socket) do
-    with {:ok, user_id} <- RoomAccess.verify(room_id, token),
+    with {:ok, grant} <- RoomAccess.verify(room_id, token),
+         :ok <-
+           Phoenix.PubSub.subscribe(
+             Synixir.PubSub,
+             Synixir.Accounts.session_topic(grant.session_hash)
+           ),
+         :ok <-
+           Phoenix.PubSub.subscribe(
+             Synixir.PubSub,
+             RoomAccess.member_topic(room_id, grant.user_id)
+           ),
          {:ok, doc} <- Documents.open(room_id),
-         :ok <- observe(doc) do
+         :ok <- observe(doc),
+         {:ok, _} <- RoomAccess.with_access(grant, :read, fn _ -> :ok end) do
       monitor = Process.monitor(doc)
       limits = Application.fetch_env!(:synixir, :collaboration_limits)
       budget = MessageBudget.new(limits, System.monotonic_time(:millisecond))
 
       chunked = params["chunked_sync"] == 1
       transfer_limits = ChunkTransfer.limits()
-      reply = if chunked, do: %{transfer: transfer_limits}, else: %{}
+
+      reply =
+        if chunked, do: %{transfer: transfer_limits, role: grant.role}, else: %{role: grant.role}
+
+      Process.send_after(self(), :check_access, 30_000)
 
       {:ok, reply,
        assign(socket,
          doc: doc,
          doc_monitor: monitor,
-         user_id: user_id,
+         user_id: grant.user_id,
+         grant: grant,
          message_budget: budget,
          chunked: chunked,
          transfer_limits: transfer_limits,
@@ -77,8 +93,14 @@ defmodule SynixirWeb.DocumentChannel do
              System.monotonic_time(:millisecond)
            ) do
         {:ok, budget} ->
-          {result, socket} = dispatch_message(event, payload, socket)
-          {result, socket, budget}
+          case RoomAccess.with_access(socket.assigns.grant, :read, fn _ -> :ok end) do
+            {:ok, :ok} ->
+              {result, socket} = dispatch_message(event, payload, socket)
+              {result, socket, budget}
+
+            {:error, _} ->
+              {{:error, :unauthorized}, socket, budget}
+          end
 
         {:error, reason, budget} ->
           {{:error, reason}, socket, budget}
@@ -110,6 +132,8 @@ defmodule SynixirWeb.DocumentChannel do
     )
 
     protocol_reply(result, assign(socket, :message_budget, budget))
+  rescue
+    _ -> {:reply, {:error, %{reason: "unauthorized"}}, socket}
   end
 
   defp dispatch_message(
@@ -122,7 +146,10 @@ defmodule SynixirWeb.DocumentChannel do
         {{:ok, [], false}, assign(socket, :transfer, partial)}
 
       {:complete, event, data} ->
-        {Documents.transfer(socket.assigns.doc, event, data), assign(socket, :transfer, nil)}
+        kind = if event == "save_update", do: :update, else: :sync
+
+        {Documents.authenticated(socket.assigns.doc, kind, data, socket.assigns.grant, :transfer),
+         assign(socket, :transfer, nil)}
 
       {:error, reason} ->
         {{:error, reason}, assign(socket, :transfer, nil)}
@@ -130,19 +157,21 @@ defmodule SynixirWeb.DocumentChannel do
   end
 
   defp dispatch_message(event, payload, socket),
-    do: {dispatch(event, payload, socket.assigns.doc), socket}
+    do: {dispatch(event, payload, socket), socket}
 
-  defp dispatch(event, {:binary, message}, doc) when event in ["yjs_sync", "yjs"] do
-    Documents.sync(doc, message)
+  defp dispatch(event, {:binary, message}, socket) when event in ["yjs_sync", "yjs"] do
+    Documents.authenticated(socket.assigns.doc, :sync, message, socket.assigns.grant)
   end
 
-  defp dispatch("save_update", {:binary, update}, doc), do: Documents.save_update(doc, update)
+  defp dispatch("save_update", {:binary, update}, socket),
+    do: Documents.authenticated(socket.assigns.doc, :update, update, socket.assigns.grant)
+
   defp dispatch(_event, _payload, _doc), do: {:error, :unsupported_message}
 
   defp protocol_reply(result, socket) do
     case result do
       {:ok, messages, saved} ->
-        case send_messages(messages, socket) do
+        case authorized_messages(messages, socket) do
           {:ok, socket} -> {:reply, {:ok, %{saved: saved}}, socket}
           {:error, reason} -> {:reply, {:error, %{reason: Atom.to_string(reason)}}, socket}
         end
@@ -154,13 +183,29 @@ defmodule SynixirWeb.DocumentChannel do
 
   @impl true
   def handle_info({:yjs, message, doc}, %{assigns: %{doc: doc}} = socket) do
-    case send_messages([message], socket) do
+    case authorized_messages([message], socket) do
       {:ok, socket} ->
         {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        revoke(socket)
 
       {:error, _reason} ->
         push(socket, "sync_error", %{reason: "message_too_large"})
         {:stop, :normal, socket}
+    end
+  end
+
+  def handle_info(:access_revoked, socket), do: revoke(socket)
+
+  def handle_info(:check_access, socket) do
+    case RoomAccess.with_access(socket.assigns.grant, :read, fn _ -> :ok end) do
+      {:ok, :ok} ->
+        Process.send_after(self(), :check_access, 30_000)
+        {:noreply, socket}
+
+      _ ->
+        revoke(socket)
     end
   end
 
@@ -172,6 +217,25 @@ defmodule SynixirWeb.DocumentChannel do
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{assigns: %{doc_monitor: ref}} = socket) do
     {:stop, :document_unavailable, socket}
+  end
+
+  defp revoke(socket) do
+    ChunkTransfer.discard(socket.assigns.transfer)
+    push(socket, "access_revoked", %{reason: "access_changed"})
+    {:stop, :normal, socket}
+  end
+
+  # Keep the read lock until pushes are queued. Already-sent bytes cannot be
+  # recalled, but events waiting in this channel's mailbox are reauthorized.
+  defp authorized_messages(messages, socket) do
+    case RoomAccess.with_access(socket.assigns.grant, :read, fn _ ->
+           send_messages(messages, socket)
+         end) do
+      {:ok, result} -> result
+      {:error, _} -> {:error, :unauthorized}
+    end
+  rescue
+    _ -> {:error, :unauthorized}
   end
 
   defp send_messages(messages, socket) do

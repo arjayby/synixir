@@ -50,6 +50,13 @@ defmodule Synixir.Documents do
     request(doc, kind, message, :transfer)
   end
 
+  @doc false
+  def authenticated(doc, kind, message, grant, mode \\ :message) do
+    with {:ok, decoded} <- Synixir.Documents.Protocol.decode(kind, message, mode) do
+      call(doc, {:authorized, decoded, grant})
+    end
+  end
+
   defp request(doc, kind, message, mode \\ :message) do
     with {:ok, decoded} <- Synixir.Documents.Protocol.decode(kind, message, mode) do
       call(doc, {:validated, decoded})

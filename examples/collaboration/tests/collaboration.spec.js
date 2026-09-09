@@ -1,3 +1,4 @@
+import { openRoom } from "./access-helpers.js";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.js";
 
@@ -10,8 +11,8 @@ test("clients in different rooms keep their documents separate", async ({ browse
   try {
     const [alpha, beta] = await Promise.all(contexts.map((context) => context.newPage()));
     await Promise.all([
-      alpha.goto(`${baseURL}/?room=alpha-${run}`),
-      beta.goto(`${baseURL}/?room=beta-${run}`),
+      openRoom(alpha, `${baseURL}/?room=alpha-${run}`),
+      openRoom(beta, `${baseURL}/?room=beta-${run}`),
     ]);
     for (const page of [alpha, beta]) {
       await expect(page.locator("#status")).toHaveText("Connected");
@@ -39,7 +40,7 @@ test("editing and undo preserve another participant's changes", async ({ browser
   try {
     const [alice, bob] = await Promise.all(contexts.map(context => context.newPage()));
     const url = `${baseURL}/?room=editor-${randomUUID()}`;
-    await Promise.all([alice.goto(url), bob.goto(url)]);
+    await Promise.all([openRoom(alice, url), openRoom(bob, url)]);
     await Promise.all([connected(alice), connected(bob)]);
     await expect(alice.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
 
@@ -77,7 +78,7 @@ test("awareness shows participants and selections and removes them on departure"
   try {
     const [alice, bob] = await Promise.all(contexts.map(context => context.newPage()));
     const url = `${baseURL}/?room=presence-${randomUUID()}`;
-    await Promise.all([alice.goto(url), bob.goto(url)]);
+    await Promise.all([openRoom(alice, url), openRoom(bob, url)]);
     await Promise.all([connected(alice), connected(bob)]);
     const aliceName = await alice.locator("#your-name").textContent();
     const bobName = await bob.locator("#your-name").textContent();
@@ -95,7 +96,7 @@ test("awareness shows participants and selections and removes them on departure"
     await insertAtStart(bob, "Before ");
     await expectText(alice, "Before Hello everyone");
     await expect(bob.locator(".cm-ySelection")).toHaveText("Hello");
-    await alice.getByLabel("Room ID").focus();
+    await alice.getByLabel("Room ID", { exact: true }).focus();
     await expect(bob.locator(".cm-ySelectionCaret")).toHaveCount(0);
 
     await alice.getByRole("button", { name: "Disconnect", exact: true }).click();
@@ -120,12 +121,12 @@ test("awareness shows participants and selections and removes them on departure"
 
 test("offline edits prompt before leaving and survive cancelling room navigation", async ({ page, baseURL }) => {
   const room = `leave-${randomUUID()}`;
-  await page.goto(`${baseURL}/?room=${room}`);
+  await openRoom(page, `${baseURL}/?room=${room}`);
   await connected(page);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await insertAtStart(page, "Keep this draft");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
-  await page.getByLabel("Room ID").fill(`other-${randomUUID()}`);
+  await page.getByLabel("Room ID", { exact: true }).fill(`other-${randomUUID()}`);
   const dialogPromise = page.waitForEvent("dialog");
   await page.getByRole("button", { name: "Open room", exact: true }).click({ noWaitAfter: true });
   const dialog = await dialogPromise;
@@ -149,7 +150,7 @@ test("independent clients merge concurrent text edits through Phoenix and Yex", 
   try {
     const alice = await aliceContext.newPage();
     const bob = await bobContext.newPage();
-    await Promise.all([alice.goto(roomUrl), bob.goto(roomUrl)]);
+    await Promise.all([openRoom(alice, roomUrl), openRoom(bob, roomUrl)]);
     await expect(alice.locator("#status")).toHaveText("Connected");
     await expect(bob.locator("#status")).toHaveText("Connected");
 
@@ -185,7 +186,7 @@ test("independent clients merge concurrent text edits through Phoenix and Yex", 
     const newcomerContext = await browser.newContext();
     try {
       const newcomer = await newcomerContext.newPage();
-      await newcomer.goto(roomUrl);
+      await openRoom(newcomer, roomUrl);
       await expect(newcomer.locator("#status")).toHaveText("Connected");
       await expectText(newcomer, mergedText);
     } finally {
@@ -204,7 +205,7 @@ test("saved inserts and deletions survive a killed server without help from old 
   const writerContext = await browser.newContext();
   try {
     const writer = await writerContext.newPage();
-    await writer.goto(roomUrl);
+    await openRoom(writer, roomUrl);
     await expect(writer.locator("#status")).toHaveText("Connected");
     await insertAtStart(writer, "👋Saved after restart");
     await expect(writer.locator("#save-status")).toHaveText("Saved");
@@ -220,7 +221,7 @@ test("saved inserts and deletions survive a killed server without help from old 
   const readerContext = await browser.newContext();
   try {
     const reader = await readerContext.newPage();
-    await reader.goto(roomUrl);
+    await openRoom(reader, roomUrl);
     await expect(reader.locator("#status")).toHaveText("Connected");
     await expectText(reader, "Saved after restart");
     await reader.getByRole("button", { name: "Disconnect", exact: true }).click();
@@ -238,7 +239,7 @@ test("saved inserts and deletions survive a killed server without help from old 
   const finalContext = await browser.newContext();
   try {
     const page = await finalContext.newPage();
-    await page.goto(roomUrl);
+    await openRoom(page, roomUrl);
     await expectText(page, "Offline Saved after restart");
   } finally {
     await finalContext.close();

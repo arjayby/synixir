@@ -9,7 +9,6 @@ import Config
 
 config :synixir,
   ecto_repos: [Synixir.Repo],
-  collaboration_demo: false,
   generators: [timestamp_type: :utc_datetime]
 
 config :synixir, :collaboration_limits,
@@ -25,6 +24,8 @@ config :synixir, :document_lifecycle,
   idle_timeout_ms: 60_000,
   compact_after_updates: 256,
   compact_after_bytes: 4_194_304
+
+config :synixir, :authentication_limits, attempts: 20, window_ms: 60_000
 
 # Configure the endpoint
 config :synixir, SynixirWeb.Endpoint,
@@ -46,7 +47,7 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-config :phoenix, :filter_parameters, ["password", "token"]
+config :phoenix, :filter_parameters, ["password", "token", "_csrf_token"]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

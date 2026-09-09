@@ -1,6 +1,32 @@
 import { createConnection } from "node:net";
+import { request } from "node:http";
 import { randomBytes } from "node:crypto";
 import { test, expect } from "./fixtures.js";
+
+test("the WebSocket handshake rejects an untrusted browser origin", async () => {
+  const status = await new Promise((resolve, reject) => {
+    const req = request("http://127.0.0.1:4010/socket/websocket?vsn=2.0.0", {
+      headers: {
+        Origin: "https://untrusted.example",
+        Connection: "Upgrade",
+        Upgrade: "websocket",
+        "Sec-WebSocket-Version": "13",
+        "Sec-WebSocket-Key": randomBytes(16).toString("base64"),
+      },
+    }, response => {
+      response.resume();
+      resolve(response.statusCode);
+    });
+    req.on("upgrade", (response, socket) => {
+      socket.destroy();
+      resolve(response.statusCode);
+    });
+    req.on("error", reject);
+    req.setTimeout(5_000, () => req.destroy(new Error("Origin check timed out")));
+    req.end();
+  });
+  expect(status).toBe(403);
+});
 
 function frame(size, opcode, final) {
   const bytes = Buffer.alloc(14 + size);

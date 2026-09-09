@@ -33,26 +33,60 @@ defmodule Synixir.Documents.Store do
     measure(:save, %{bytes: byte_size(update), inserted: 0}, fn ->
       inserted =
         locked(room_id, fn ->
-          {inserted, _} =
-            Repo.insert_all(
-              "document_updates",
-              [
-                %{
-                  room_id: room_id,
-                  data: update,
-                  digest: :crypto.hash(:sha256, update),
-                  inserted_at: DateTime.utc_now()
-                }
-              ],
-              on_conflict: :nothing,
-              conflict_target: [:room_id, :digest]
-            )
-
-          inserted
+          insert_update(room_id, update)
         end)
 
       {:ok, %{bytes: byte_size(update), inserted: inserted}}
     end)
+  end
+
+  # The authorization locks, live apply, and raw insert share one transaction.
+  # Record a successful save only after that outer transaction commits.
+  def append_authorized(room_id, update, grant, apply_update) do
+    started = System.monotonic_time()
+
+    try do
+      result =
+        Synixir.RoomAccess.with_access(grant, :write, fn _ ->
+          locked(room_id, fn ->
+            :ok = apply_update.()
+            insert_update(room_id, update)
+          end)
+        end)
+
+      case result do
+        {:ok, inserted} ->
+          record(:save, started, :ok, %{bytes: byte_size(update), inserted: inserted})
+          :ok
+
+        {:error, reason} ->
+          record(:save, started, reason, %{bytes: byte_size(update), inserted: 0})
+          {:error, reason}
+      end
+    rescue
+      error ->
+        record(:save, started, :storage_unavailable, %{bytes: byte_size(update), inserted: 0})
+        reraise error, __STACKTRACE__
+    end
+  end
+
+  defp insert_update(room_id, update) do
+    {inserted, _} =
+      Repo.insert_all(
+        "document_updates",
+        [
+          %{
+            room_id: room_id,
+            data: update,
+            digest: :crypto.hash(:sha256, update),
+            inserted_at: DateTime.utc_now()
+          }
+        ],
+        on_conflict: :nothing,
+        conflict_target: [:room_id, :digest]
+      )
+
+    inserted
   end
 
   # Merge bytes, never a materialized Yex document: encode_state_as_update/1 in

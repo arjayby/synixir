@@ -24,6 +24,7 @@ defmodule Synixir.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Synixir.DataCase
+      import Synixir.AccessHelpers
     end
   end
 

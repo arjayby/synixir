@@ -1,6 +1,7 @@
 import Config
 
-config :synixir, collaboration_demo: true
+config :argon2_elixir, t_cost: 1, m_cost: 8
+config :synixir, :authentication_limits, attempts: 10_000, window_ms: 60_000
 
 # Configure your database
 #
