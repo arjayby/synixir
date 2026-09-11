@@ -1,6 +1,6 @@
 const colors = ["#3565b0", "#9a4626", "#7a4daa", "#26735b", "#aa3864", "#74601b"];
 
-export function showParticipants(room, username) {
+export function showParticipants(room, username, { avatars = false } = {}) {
   const awareness = room.awareness;
   const list = document.querySelector("#participants");
   const count = document.querySelector("#participant-count");
@@ -24,6 +24,10 @@ export function showParticipants(room, username) {
       const label = document.createElement("span");
       label.className = "participant-name";
       label.textContent = typeof state.user.name === "string" ? state.user.name.slice(0, 32) : "Guest";
+      if (avatars) {
+        dot.classList.add("participant-avatar");
+        dot.textContent = label.textContent.slice(0, 2).toUpperCase();
+      }
       const detail = document.createElement("span");
       detail.className = "participant-detail";
       detail.textContent = local ? online ? "You" : "You · offline" : "Online";

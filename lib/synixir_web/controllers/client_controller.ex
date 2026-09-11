@@ -3,6 +3,7 @@ defmodule SynixirWeb.ClientController do
 
   def index(conn, _), do: page(conn, "index.html")
   def settings(conn, _), do: page(conn, "sdk.html")
+  def kanban(conn, _), do: page(conn, "kanban.html")
 
   defp page(conn, name) do
     path = Application.app_dir(:synixir, "priv/static/" <> name)

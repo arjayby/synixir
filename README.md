@@ -4,8 +4,9 @@ Synixir is an Elixir/Phoenix collaboration backend in early development.
 It connects browser Yjs documents to supervised Yex processes through Phoenix
 Channels. Each room has its own document process backed by a PostgreSQL update
 log, and clients need a signed room access token to join. The browser example
-provides a shared plain text editor with live cursors, participant information,
-and recovery after a server crash.
+provides a shared plain text editor with live cursors. A Kanban example adds
+shared cards, drag-and-drop, and card activity. Both recover saved state after a
+server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
 owner/editor/viewer room permissions are implemented. The browser SDK lives in
@@ -137,6 +138,50 @@ installation, connection and save states, cancellation, cleanup, and custom
 access callbacks. `/sdk.html?room=<room_id>` provides a second small consumer
 that synchronizes a title in a Y.Map without CodeMirror. It uses the same signed-in
 account and room membership as the editor.
+
+## Try the Kanban example
+
+Open [127.0.0.1:5173/kanban.html](http://127.0.0.1:5173/kanban.html) with the same
+development servers running. Sign in and create a board, or open an existing room.
+The text editor and board link to each other and share account and room access.
+The production build also includes `/kanban.html`.
+
+- Add cards to Backlog, In progress, or Done. Open a card to edit its title,
+  description, color, and status. Changes save as you type.
+- Drag cards between columns, or use the status selector with a keyboard or on
+  a touch device. Moved cards go to the end of the destination column.
+- Open the same board in two tabs to see changes and card activity. To collaborate
+  with another account, grant its username access under **Manage access**.
+- Undo and redo affect this tab's local changes. Deleted cards can be restored
+  with Undo. Viewers can inspect cards and publish presence, but cannot edit them.
+- Offline changes remain in the open tab. Reconnect and wait for **Saved** before
+  closing it. Saved boards recover through the existing PostgreSQL document log.
+
+The [board model](examples/collaboration/kanban/model.js) stores each card as a
+nested Y.Map under `kanban:cards:v1`. Column and order are a single placement value,
+so simultaneous moves converge to one location without duplicating a card.
+Edits to different fields merge. Concurrent edits to the same title, description,
+color, or placement resolve through Y.Map's conflict rules to one value; these
+fields do not provide character-level text merging. A deletion wins over a
+concurrent edit to that card. Ordering ties use the card ID. This first example
+has fixed columns and does not support reordering within a column.
+
+The [shared example shell](examples/collaboration/example-shell.js) owns account,
+room, connection, permission, and cleanup UI for both examples. Each editing
+surface consumes the public SDK. Kanban's data uses a separate shared type, so
+opening a text room as a board does not change its text content.
+
+`npm test` includes model checks for concurrent creation, moves, deletion, and
+local undo. The browser suite includes Kanban sync, presence, dragging, offline
+recovery, server restart, permissions, room navigation, and mobile layout.
+
+Run only the Kanban browser checks with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- kanban.spec.js
+```
+
+## Editor presence and connection states
 
 Each account has a stable username; each editor visit gets a cursor color. The participant list
 counts connected editor visits, including multiple tabs for one account. Names
