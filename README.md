@@ -1,23 +1,60 @@
 # Synixir
 
-Synixir is an Elixir/Phoenix collaboration backend in early development.
-It connects browser Yjs documents to supervised Yex processes through Phoenix
-Channels. Each room has its own document process backed by a PostgreSQL update
-log, and clients need a signed room access token to join. The browser example
-provides a shared plain text editor with live cursors, participant information,
-and recovery after a server crash.
+Synixir is an Elixir/Phoenix backend for collaborative Yjs documents. It
+synchronizes shared text and application state through Phoenix Channels, stores
+document updates in PostgreSQL, and shares live presence between participants.
+Use the JavaScript SDK to connect your own application, or try the included
+CodeMirror editor and shared settings examples.
 
-This implementation runs on one Phoenix node. Accounts, expiring sessions, and
-owner/editor/viewer room permissions are implemented. The browser SDK lives in
-[`@synixir/client`](packages/client/README.md), with JavaScript sources and
-TypeScript declarations. It is not yet published to npm.
+- Durable document updates, snapshots, compaction, and recovery after a server crash.
+- Live cursors and participant presence, with reconnect support and local undo.
+- Accounts, expiring sessions, and owner/editor/viewer room permissions.
+- A JavaScript SDK with TypeScript declarations, chunked transfers, and save
+  status that confirms database persistence.
+- Admission and storage quotas, health probes, protected Prometheus metrics,
+  alert rules, load checks, and verified database backups.
+- A Docker release with packaged browser assets, local HTTPS staging, and a CI
+  pilot that exercises collaboration, app replacement, and database recovery.
 
-Step 10 adds admission and storage quotas, health endpoints, protected Prometheus
-metrics, alert examples, an SDK load runner, and database backup/restore checks.
-See the [operations guide](docs/operations.md) for limits, commands and measured
-results. Deployment and wiring external monitoring/backups are the next milestone.
+Synixir currently runs on one Phoenix node, with downtime during upgrades.
+Offline edits remain in the open tab until the server confirms a save. The
+[`@synixir/client`](packages/client/README.md) package is available in this
+repository and has not been published to npm. Local staging is implemented;
+public hosting, external alert delivery, and off-machine backup scheduling
+require separate setup.
+
+| Guide | Contents |
+|---|---|
+| [Client SDK](packages/client/README.md) | Installation, connection and save states, and integration examples |
+| [Local Docker staging](docs/deployment.md) | HTTPS setup, browser pilot, backups, replacement, and rollback |
+| [Operations](docs/operations.md) | Quotas, health checks, metrics, alert rules, and load results |
+
+## Try local Docker staging
+
+Start Docker or OrbStack. With Docker Compose v2, Python 3.11 or newer, and
+OpenSSL installed, run these commands from the repository for the first setup:
+
+```sh
+python3 scripts/staging.py init
+python3 scripts/staging.py build
+python3 scripts/staging.py up
+```
+
+Open [https://localhost:8443](https://localhost:8443), accept the local self-signed
+certificate, and create an account and room. The release includes both browser
+examples and uses its own PostgreSQL volume and private Prometheus collector.
+Docker builds Elixir, Erlang, and the frontend inside the image.
+
+For an existing installation, run `python3 scripts/staging.py up` to start it.
+Use `python3 scripts/staging.py stop` to stop it while retaining the database.
+Initialization runs only once; keep the private `.local/staging` configuration
+with its database volume. The [staging runbook](docs/deployment.md) covers the
+browser pilot, certificate renewal, backups, and upgrades.
 
 ## Local setup
+
+Use this setup to develop the Phoenix backend and run the browser examples with
+Vite. It uses a separate database and ports from Docker staging.
 
 - Elixir 1.18.3 and Erlang/OTP 27.3.3, pinned in `.tool-versions` for asdf.
 - A C compiler and `make` for Argon2 password hashing, such as the Xcode Command
@@ -56,8 +93,9 @@ versions in `.tool-versions`. Run the commands below from the project directory.
    ```
 
 The server listens at [localhost:4000](http://localhost:4000), with a collaboration
-WebSocket at `/socket/websocket`. There is no homepage, so `/` returns 404.
-Use `iex -S mix phx.server` for an interactive shell.
+WebSocket at `/socket/websocket`. Open the Vite example below for the development
+UI; the Docker release serves the packaged example at `/`. Use
+`iex -S mix phx.server` for an interactive shell.
 
 Use `docker compose ps` to check PostgreSQL and `docker compose logs db` to read
 its logs. Stop it with `docker compose stop db`; start it again with the command
@@ -174,17 +212,19 @@ which requires HTTPS. Login renews the cookie and rotates CSRF state; logout
 deletes the session before returning success. Every authenticated HTTP request
 looks up the session, and room operations check it again at their authorization
 boundary. Authentication attempts are limited to 20 per remote IP per minute in
-one node, before password hashing. This limiter uses the connection's remote IP;
-trusted proxy/IP configuration belongs to deployment setup. Room and channel
+one node, before password hashing. This limiter uses the connection's remote IP.
+The local Docker gateway overwrites forwarded client addresses; production trusts
+those headers, so keep the app listener private to the gateway. Room and channel
 quotas are described in the [operations guide](docs/operations.md).
 
 All JSON API routes fetch the session and use CSRF protection. First fetch
 `GET /api/session`, retain its `csrf_token` in memory, and send it as
 `x-csrf-token` for state-changing requests. Retain the returned cookies. Responses
-use `Cache-Control: no-store`. Vite proxies `/api` and `/socket` to Phoenix;
-production should expose both through the application's HTTPS origin. WebSocket
-origin checks allow the configured frontend origins. Socket connections alone
-carry no identity: each room join must present an authorized bearer grant.
+use `Cache-Control: no-store`. Vite proxies `/api` and `/socket` to Phoenix.
+The Docker release serves the frontend, API, and WebSockets through one HTTPS
+origin. Production WebSocket origin checks include the scheme and port. Socket
+connections alone carry no identity: each room join must present an authorized
+bearer grant.
 
 | Method and path | Purpose |
 |---|---|
@@ -344,8 +384,9 @@ events. It refills over time; excess requests receive `rate_limited` without
 entering the document process. Another collaborator has a separate budget.
 Rejoining starts a new budget. Separate admission quotas bound joined channels
 per account, room and node, along with resident documents and rooms owned by an
-account. Anonymous raw WebSockets and aggregate traffic per IP still need
-deployment gateway limits.
+account. The local Docker gateway also limits active connections and HTTP request
+rates per IP. These are staging defaults to tune for the deployed workload; see
+the [gateway configuration](docs/deployment.md#release-contents-and-ingress).
 
 Payload sizes and rate settings use the `:collaboration_limits` application
 configuration. The transport limits are configured separately in the endpoint
@@ -454,10 +495,11 @@ library behavior.
 
 These snapshots consolidate CRDT updates and duplicate history; they do not
 provide user-visible versions, retention, or garbage collection of all deleted
-history. Multi-node ownership remains outside this milestone.
+history. Multi-node room ownership is not implemented.
 
-Yex uses precompiled native binaries on supported platforms; the installed
-Elixir/OTP versions were checked on Apple Silicon without Rust.
+Yex uses precompiled native binaries on supported platforms. The Docker release
+pilot exercises both Yex and Argon2 inside the final image. It has passed locally
+on ARM64 and emulated AMD64, and CI runs it on native AMD64.
 
 ## Telemetry
 
@@ -482,7 +524,7 @@ bytes describe the replayed log. Failed restores report zero counts. Compaction 
 resulting snapshot size. Idle unloads increment a counter. Active
 documents are sampled every 10 seconds and include rooms with no participants.
 
-The new events contain no document content, tokens, room IDs, or user IDs. Labels
+These events contain no document content, tokens, room IDs, or user IDs. Labels
 use a fixed set of event names and outcomes. The Prometheus exporter uses a
 separate metric list in `Synixir.Operations.Metrics`, converts durations to seconds,
 and normalizes labels through finite allowlists. Enable `/metrics` with
@@ -585,8 +627,10 @@ and pushes to `main`. It uses the versions in `.tool-versions` and the same
 PostgreSQL image as Compose. Each run gets a fresh database and runs the browser
 test in Chromium. CI checks formatting without modifying files, installs
 JavaScript dependencies from the lockfile, and fails if Elixir dependency
-resolution would change `mix.lock`. GitHub runs the workflow once the file is
-pushed as part of a pull request or to `main`.
+resolution would change `mix.lock`. It also verifies backup restoration,
+concurrent quotas, SDK load and replay, and Prometheus configuration and alerts.
+A separate job builds the production Docker image on native AMD64 and runs the
+HTTPS staging pilot in a disposable Compose project.
 
 Production runtime configuration is in `config/runtime.exs`. It reads
 `DATABASE_URL`, `SECRET_KEY_BASE` and an HTTPS `SYNIXIR_PUBLIC_URL`, with optional
