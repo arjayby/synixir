@@ -104,8 +104,9 @@ export function startExample({ createSurface, pagePath = "/", presenceOptions })
     } catch (error) { document.querySelector("#account-error").textContent = explain(error); }
   }
   document.querySelectorAll("[data-room-home]").forEach(link => { link.href = pagePath; });
-  const exampleLink = document.querySelector("#other-example");
-  if (exampleLink && roomId) exampleLink.href += `?room=${encodeURIComponent(roomId)}`;
+  if (roomId) document.querySelectorAll("#other-example, [data-example-link]").forEach(link => {
+    link.href += `?room=${encodeURIComponent(roomId)}`;
+  });
   void boot();
 
   function startCollaboration(user) {

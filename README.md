@@ -5,7 +5,8 @@ It connects browser Yjs documents to supervised Yex processes through Phoenix
 Channels. Each room has its own document process backed by a PostgreSQL update
 log, and clients need a signed room access token to join. The browser example
 provides a shared plain text editor with live cursors. A Kanban example adds
-shared cards, drag-and-drop, and card activity. Both recover saved state after a
+shared cards, drag-and-drop, and card activity. A whiteboard adds sticky notes,
+shapes, live cursors, and selections. All examples recover saved state after a
 server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
@@ -179,6 +180,45 @@ Run only the Kanban browser checks with:
 
 ```sh
 npm test --workspace synixir-collaboration-example -- kanban.spec.js
+```
+
+## Try the whiteboard example
+
+Open [127.0.0.1:5173/whiteboard.html](http://127.0.0.1:5173/whiteboard.html) with the
+same development servers running. Sign in and create a room, or open an existing
+one. Links between the text editor, Kanban board, and whiteboard retain the room.
+Each example stores its data separately inside that room's Yjs document.
+
+- Add sticky notes, rectangles, and ellipses. Select an object to edit its text,
+  color, width, or height, bring it to the front, or delete it.
+- Drag objects with a mouse or touch. Arrow keys move the selected object one
+  canvas pixel; Shift + arrows move it ten. Escape cancels an active drag.
+- Scroll around the fixed 1600 × 1000 canvas. Zoom controls range from 50% to
+  150%; zoom and scroll are local to each tab.
+- Teammates see cursors, selection outlines, and live movement previews. Presence
+  labels are client-supplied and do not establish identity or lock objects.
+- A completed drag saves one position change and creates one undo step. Movement
+  previews use temporary awareness state. Cancelling a drag or closing its tab
+  before releasing it leaves the saved position unchanged.
+- Undo and redo affect this tab's changes. Viewers can select objects and publish
+  cursors, but cannot change content, geometry, or layer order.
+
+The [whiteboard model](examples/collaboration/whiteboard/model.js) uses nested
+Y.Maps under `whiteboard:objects:v1`. Position and size are separate atomic values,
+so moving an object does not overwrite a teammate's text or color edits.
+Simultaneous edits to the same property resolve to one value through Y.Map's
+conflict rules. Text does not merge at the character level. Deleting an object
+wins over a concurrent edit to that object. The UI bounds objects to the canvas.
+
+Offline edits remain in the open tab until reconnecting. Wait for **Saved** before
+closing it. The production build includes `/whiteboard.html` and uses the same
+room permissions, PostgreSQL persistence, and recovery flow as the other examples.
+
+`npm test` includes whiteboard concurrency and undo checks. Run its browser
+checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- whiteboard.spec.js
 ```
 
 ## Editor presence and connection states

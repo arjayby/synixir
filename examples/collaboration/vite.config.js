@@ -8,6 +8,7 @@ export default defineConfig({
         collaboration: fileURLToPath(new URL("./index.html", import.meta.url)),
         settings: fileURLToPath(new URL("./sdk.html", import.meta.url)),
         kanban: fileURLToPath(new URL("./kanban.html", import.meta.url)),
+        whiteboard: fileURLToPath(new URL("./whiteboard.html", import.meta.url)),
       },
     },
   },

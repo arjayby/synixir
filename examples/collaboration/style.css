@@ -22,6 +22,7 @@ input { width: 100%; background: #fff; color: inherit; min-width: 0; }
 .brand > span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; background: #245e48; color: #fff; font-size: 20px; }
 .demo-label, .note, .intro, .page-footer { color: #5b6d63; }
 .demo-label { font-size: 12px; }
+.example-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 20px; margin-left: 20px; }
 .workspace-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 40px 0 28px; }
 .eyebrow { margin: 0 0 10px; font-size: 11px; font-weight: 650; letter-spacing: 1.4px; text-transform: uppercase; color: #416b53; }
 h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 600; line-height: 1.15; letter-spacing: -1.2px; margin: 0; }
