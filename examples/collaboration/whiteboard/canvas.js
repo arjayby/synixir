@@ -1,18 +1,24 @@
 import { createWhiteboardModel, canvasSize, colors } from "./model.js";
+import { createMotion } from "./motion.js";
 
 export function createWhiteboard(room) {
   const root = document.querySelector("#editor");
   document.querySelector("#open-peer").href = window.location.href;
   const model = createWhiteboardModel(room.doc);
+  const motion = createMotion();
+  let items = model.list();
+  let activityFrame;
   const events = new AbortController();
   const on = (target, event, handler) => target.addEventListener(event, handler, { signal: events.signal });
   const nodes = new Map();
+  const peerNodes = new Map();
   let readOnly = true;
   let selectedId = null;
   let drag = null;
   let cursor = null;
   let zoom = 1;
   let presenceTimer;
+  let lastPresenceAt = -Infinity;
   let disposed = false;
   const undo = document.querySelector("#undo");
   const redo = document.querySelector("#redo");
@@ -54,7 +60,7 @@ export function createWhiteboard(room) {
     option.textContent = color[0].toUpperCase() + color.slice(1);
     colorInput.append(option);
   }
-  const selected = () => model.list().find(item => item.id === selectedId);
+  const selected = () => items.find(item => item.id === selectedId);
   const validPoint = point => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
     point.x >= 0 && point.y >= 0 && point.x <= canvasSize.width && point.y <= canvasSize.height;
   const worldPoint = event => {
@@ -65,11 +71,15 @@ export function createWhiteboard(room) {
     clearTimeout(presenceTimer);
     presenceTimer = undefined;
     if (disposed) return;
+    lastPresenceAt = performance.now();
     room.awareness.setLocalStateField("whiteboard", { cursor, selectedId,
       drag: drag?.moved ? { id: drag.id, ...drag.position } : null });
   }
   function schedulePresence() {
-    if (presenceTimer === undefined) presenceTimer = setTimeout(publish, 60);
+    if (presenceTimer !== undefined) return;
+    const remaining = 60 - (performance.now() - lastPresenceAt);
+    if (remaining <= 0) publish();
+    else presenceTimer = setTimeout(publish, remaining);
   }
   function select(id) {
     selectedId = id;
@@ -82,7 +92,7 @@ export function createWhiteboard(room) {
     drag = null;
     if (previous && viewport.hasPointerCapture(previous.pointerId)) viewport.releasePointerCapture(previous.pointerId);
     publish();
-    renderObjects();
+    scheduleActivity();
   }
   function setZoom(value) {
     cancelDrag();
@@ -135,7 +145,7 @@ export function createWhiteboard(room) {
       if (Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 2) drag.moved = true;
       drag.position = model.boundedPosition({ x: drag.original.x + point.x - drag.start.x,
         y: drag.original.y + point.y - drag.start.y }, drag.size);
-      renderObjects();
+      scheduleActivity();
     }
     schedulePresence();
   });
@@ -149,7 +159,7 @@ export function createWhiteboard(room) {
       announce("Object moved.");
     }
     publish();
-    renderObjects();
+    scheduleActivity();
   });
   on(viewport, "pointercancel", cancelDrag);
   on(viewport, "lostpointercapture", () => { if (drag) cancelDrag(); });
@@ -207,12 +217,16 @@ export function createWhiteboard(room) {
         name: typeof state.user?.name === "string" ? state.user.name.slice(0, 32) : "Guest",
         color: /^#[0-9a-f]{6}$/i.test(state.user?.color) ? state.user.color : "#3565b0" }));
   }
-  function renderObjects() {
-    if (disposed) return;
-    const items = model.list();
+  function scheduleActivity() {
+    if (!disposed && activityFrame === undefined) activityFrame = requestAnimationFrame(renderActivity);
+  }
+  function syncObjects() {
     const present = new Set(items.map(item => item.id));
-    for (const [id, node] of nodes) if (!present.has(id)) { node.remove(); nodes.delete(id); }
-    const remote = peers();
+    for (const [id, node] of nodes) if (!present.has(id)) {
+      motion.forget(node);
+      node.remove();
+      nodes.delete(id);
+    }
     items.forEach((item, index) => {
       let node = nodes.get(item.id);
       if (!node) {
@@ -222,48 +236,82 @@ export function createWhiteboard(room) {
         nodes.set(item.id, node);
         layer.append(node);
       }
-      const preview = drag?.id === item.id ? drag.position : remote.findLast(peer => peer.drag?.id === item.id && validPoint(peer.drag))?.drag;
-      const position = preview ? model.boundedPosition(preview, item.size) : item.position;
       node.className = `whiteboard-object object-${item.kind} color-${item.color}`;
       node.classList.toggle("is-selected", selectedId === item.id);
       node.setAttribute("aria-pressed", String(selectedId === item.id));
       node.setAttribute("aria-label", `${item.kind === "sticky" ? "Sticky note" : item.kind === "ellipse" ? "Ellipse" : "Rectangle"}: ${item.text || "Untitled"}`);
       if (node.textContent !== item.text) node.textContent = item.text;
-      Object.assign(node.style, { left: `${position.x}px`, top: `${position.y}px`, width: `${item.size.width}px`, height: `${item.size.height}px`, zIndex: String(index) });
+      Object.assign(node.style, { width: `${item.size.width}px`, height: `${item.size.height}px`, zIndex: String(index) });
     });
     root.querySelector(".canvas-empty").hidden = items.length > 0;
-    root.querySelector("#object-count").textContent = `${items.length} ${items.length === 1 ? "object" : "objects"}`;
-    presenceLayer.replaceChildren();
+    const count = `${items.length} ${items.length === 1 ? "object" : "objects"}`;
+    if (root.querySelector("#object-count").textContent !== count) root.querySelector("#object-count").textContent = count;
+  }
+  function renderActivity() {
+    activityFrame = undefined;
+    if (disposed) return;
+    const remote = peers();
+    const displayed = new Map();
+    for (const item of items) {
+      const node = nodes.get(item.id);
+      if (!node) continue;
+      const ownDrag = drag?.id === item.id;
+      const remoteDrag = remote.findLast(peer => peer.drag?.id === item.id && validPoint(peer.drag))?.drag;
+      const preview = ownDrag ? drag.position : remoteDrag;
+      const position = preview ? model.boundedPosition(preview, item.size) : item.position;
+      const smooth = !ownDrag && (Boolean(remoteDrag) || motion.moving(node));
+      motion.move(node, position, smooth);
+      displayed.set(item.id, { position, smooth });
+    }
+    const presentPeers = new Set(remote.map(peer => peer.id));
+    for (const [id, pair] of peerNodes) if (!presentPeers.has(id)) {
+      motion.forget(pair.ring);
+      motion.forget(pair.pointer);
+      pair.ring?.remove();
+      pair.pointer?.remove();
+      peerNodes.delete(id);
+    }
     for (const peer of remote) {
+      let pair = peerNodes.get(peer.id);
+      if (!pair) { pair = {}; peerNodes.set(peer.id, pair); }
       const item = items.find(item => item.id === peer.selectedId);
       if (item) {
+        if (!pair.ring) {
+          pair.ring = document.createElement("div");
+          pair.ring.className = "remote-selection";
+          pair.ring.append(document.createElement("span"));
+          presenceLayer.append(pair.ring);
+        }
         const node = nodes.get(item.id);
-        const ring = document.createElement("div");
-        ring.className = "remote-selection";
+        const ring = pair.ring;
+        if (ring.dataset.peerSelection !== item.id) motion.forget(ring);
         ring.dataset.peerSelection = item.id;
-        Object.assign(ring.style, { left: node.style.left, top: node.style.top, width: node.style.width, height: node.style.height, borderColor: peer.color });
-        const label = document.createElement("span");
-        label.textContent = peer.name;
+        const display = displayed.get(item.id);
+        motion.move(ring, display.position, display.smooth);
+        Object.assign(ring.style, { width: node.style.width, height: node.style.height, borderColor: peer.color });
+        const label = ring.firstChild;
+        if (label.textContent !== peer.name) label.textContent = peer.name;
         label.style.background = peer.color;
-        ring.append(label);
-        presenceLayer.append(ring);
-      }
+      } else { motion.forget(pair.ring); pair.ring?.remove(); pair.ring = null; }
       if (validPoint(peer.cursor)) {
-        const pointer = document.createElement("div");
-        pointer.className = "remote-cursor";
-        pointer.style.left = `${peer.cursor.x}px`;
-        pointer.style.top = `${peer.cursor.y}px`;
+        if (!pair.pointer) {
+          pair.pointer = document.createElement("div");
+          pair.pointer.className = "remote-cursor";
+          const arrow = document.createElement("span");
+          arrow.textContent = "↖";
+          pair.pointer.append(arrow, document.createElement("span"));
+          presenceLayer.append(pair.pointer);
+        }
+        const pointer = pair.pointer;
+        motion.move(pointer, peer.cursor);
         pointer.style.color = peer.color;
-        const arrow = document.createElement("span");
-        arrow.textContent = "↖";
-        const label = document.createElement("span");
-        label.textContent = peer.name;
+        const label = pointer.lastChild;
+        if (label.textContent !== peer.name) label.textContent = peer.name;
         label.style.background = peer.color;
-        pointer.append(arrow, label);
-        presenceLayer.append(pointer);
-      }
+      } else { motion.forget(pair.pointer); pair.pointer?.remove(); pair.pointer = null; }
     }
   }
+
   function renderInspector() {
     const item = selected();
     root.querySelector("#selection-empty").hidden = Boolean(item);
@@ -288,28 +336,33 @@ export function createWhiteboard(room) {
   }
   function render() {
     if (disposed) return;
-    if (selectedId && !model.list().some(item => item.id === selectedId)) {
+    items = model.list();
+    if (selectedId && !items.some(item => item.id === selectedId)) {
       selectedId = null;
       cancelDrag();
       publish();
       viewport.focus({ preventScroll: true });
       announce("The selected object was removed.");
     }
-    renderObjects();
+    syncObjects();
+    scheduleActivity();
     renderInspector();
     renderHistory();
   }
   model.objects.observeDeep(render);
-  room.awareness.on("change", renderObjects);
+  room.awareness.on("change", scheduleActivity);
   for (const event of ["stack-item-added", "stack-item-popped", "stack-cleared", "stack-item-updated"]) model.history.on(event, renderHistory);
   setZoom(1);
   render();
   function destroy() {
     disposed = true;
     clearTimeout(presenceTimer);
+    cancelAnimationFrame(activityFrame);
+    motion.destroy();
+    peerNodes.clear();
     events.abort();
     model.objects.unobserveDeep(render);
-    room.awareness.off("change", renderObjects);
+    room.awareness.off("change", scheduleActivity);
     model.destroy();
     nodes.clear();
     root.replaceChildren();
@@ -321,7 +374,7 @@ export function createWhiteboard(room) {
       root.querySelectorAll("[data-add]").forEach(button => { button.disabled = readOnly; });
       render();
     }
-    renderObjects();
+    scheduleActivity();
   };
   return destroy;
 }

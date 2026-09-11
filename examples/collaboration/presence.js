@@ -9,11 +9,17 @@ export function showParticipants(room, username, { avatars = false } = {}) {
   awareness.setLocalStateField("user", { name, color, colorLight: `${color}26` });
   document.querySelector("#your-name").textContent = name;
 
+  let previousRoster;
   function render() {
     const online = room.state.connection === "connected";
     const participants = [...awareness.getStates()]
       .filter(([id, state]) => state.user && (online || id === awareness.clientID))
       .sort(([a], [b]) => a === awareness.clientID ? -1 : b === awareness.clientID ? 1 : a - b);
+    // Awareness also changes for every cursor packet. Rebuild the roster only
+    // when the people or their displayed details change.
+    const roster = JSON.stringify([online, participants.map(([id, state]) => [id, state.user.name, state.user.color])]);
+    if (roster === previousRoster) return;
+    previousRoster = roster;
     list.replaceChildren(...participants.map(([id, state]) => {
       const local = id === awareness.clientID;
       const item = document.createElement("li");

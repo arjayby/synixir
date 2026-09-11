@@ -197,6 +197,12 @@ Each example stores its data separately inside that room's Yjs document.
   150%; zoom and scroll are local to each tab.
 - Teammates see cursors, selection outlines, and live movement previews. Presence
   labels are client-supplied and do not establish identity or lock objects.
+- Remote cursors and drag previews interpolate between presence updates with
+  an 80 ms animation. Local dragging updates on the next animation frame without
+  interpolation. Reduced-motion preferences disable interpolation. Cursor updates
+  reuse existing activity elements and do not rebuild the participant list or
+  edit controls. Presence still sends at most one scheduled movement update per
+  60 ms, with immediate final positions and activity changes.
 - A completed drag saves one position change and creates one undo step. Movement
   previews use temporary awareness state. Cancelling a drag or closing its tab
   before releasing it leaves the saved position unchanged.

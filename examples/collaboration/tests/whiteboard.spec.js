@@ -10,7 +10,10 @@ async function setup(page, baseURL) {
 }
 const saved = page => expect(page.locator("#save-status")).toHaveText("Saved");
 const note = (page, text) => page.getByRole("button", { name: `Sticky note: ${text}`, exact: true });
-const position = locator => locator.evaluate(node => ({ x: parseFloat(node.style.left), y: parseFloat(node.style.top) }));
+const position = locator => locator.evaluate(node => {
+  const transform = new DOMMatrixReadOnly(getComputedStyle(node).transform);
+  return { x: transform.m41, y: transform.m42 };
+});
 async function addNote(page, text) {
   await page.getByRole("button", { name: "+ Sticky note", exact: true }).click();
   await page.getByLabel("Object text").fill(text);
@@ -85,8 +88,10 @@ test("whiteboard merges offline edits and restores saved shapes after a crash", 
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await note(page, "Offline idea").click();
+  const beforeMove = await position(note(page, "Offline idea"));
   await page.keyboard.press("Shift+ArrowRight");
-  const moved = await position(note(page, "Offline idea"));
+  const moved = { x: beforeMove.x + 10, y: beforeMove.y };
+  await expect.poll(() => position(note(page, "Offline idea"))).toEqual(moved);
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
   await note(peer, "Offline idea").click();
   await peer.getByLabel("Object text").fill("A teammate's contribution");
