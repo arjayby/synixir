@@ -44,8 +44,10 @@ button.subtle:hover, .history-controls button:hover:not(:disabled) { background:
 #editor .cm-editor.cm-focused { outline: 2px solid #357c63; outline-offset: -2px; }
 #editor .cm-scroller { font-family: inherit; line-height: 1.85; overflow: auto; }
 #editor .cm-content { padding: 34px 28px 80px; min-height: 470px; caret-color: #245e48; }
-#editor .cm-line { padding: 0; }
-#editor .cm-placeholder { color: #78847d; }
+#editor .cm-line { position: relative; padding: 0; }
+/* Placeholder text is a hint at document position zero, not layout space
+   before a collaborator's caret at that same position. */
+#editor .cm-placeholder { position: absolute; inset-inline: 0; top: 0; color: #78847d; }
 #editor .cm-ySelectionInfo { font-family: inherit; border-radius: 3px 3px 3px 0; padding: 2px 5px; }
 .editor-footer { display: flex; justify-content: space-between; gap: 15px; padding: 13px 20px; font-size: 11px; color: #5b6d63; background: #fcfdf9; border-top: 1px solid #e0e6dd; }
 #save-status[data-state="saved"] { color: #286140; }
