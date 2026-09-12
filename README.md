@@ -7,7 +7,8 @@ log, and clients need a signed room access token to join. The browser example
 provides a shared plain text editor with live cursors. A Kanban example adds
 shared cards, drag-and-drop, and card activity. A whiteboard adds sticky notes,
 shapes, live cursors, and selections. A rich-text example adds formatted documents
-with shared selections and character-level editing. All examples recover saved state after a
+with shared selections and character-level editing. A multiplayer form adds shared
+project briefs with field presence and live previews. All examples recover saved state after a
 server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
@@ -261,6 +262,45 @@ Run its browser checks separately from `mix test` with:
 
 ```sh
 npm test --workspace synixir-collaboration-example -- rich-text.spec.js
+```
+
+## Try the multiplayer form example
+
+Open [127.0.0.1:5173/multiplayer-form.html](http://127.0.0.1:5173/multiplayer-form.html)
+with the same development servers running. Create a room or open an existing one,
+then open the form in another tab to collaborate on a project brief.
+
+- Edit the project name, goal, and audience together. Text changes merge at the
+  character level, including changes made to the same field while disconnected.
+- Choose a team, priority, target date, and launch channels. Separate fields and
+  separate checkboxes merge independently. Concurrent changes to the same choice
+  resolve to one value through Y.Map's conflict rules.
+- See who is editing or viewing each field, with participant-colored outlines
+  and shared text carets. These indicators do not lock fields. Presence clears
+  when focus leaves the form, the window loses focus, or the peer disconnects.
+- Track completion of the four required fields. Validation shows missing values
+  and text length limits without discarding the shared draft.
+- **Review brief** opens a live preview once required fields are complete. The
+  preview updates when teammates edit. This example does not submit the form to
+  an external service or record a finalized submission.
+- Undo and redo affect this tab's edits across text and choice fields. Viewers
+  can read, select text, and review the draft; they cannot edit or undo it.
+
+The [form model](examples/collaboration/multiplayer-form/model.js) stores text in
+separate top-level Y.Text fields named `multiplayer-form:<field>:v1`, with choices
+in `multiplayer-form:properties:v1`. The text controls reuse the existing
+CodeMirror/Yjs binding for shared selections, composition input, and undo.
+The `multiplayerForm` awareness field identifies the active form field. All data
+is separate from the other examples, with the same room permissions and storage.
+
+Offline changes remain in the open tab until reconnecting. Wait for **Saved**
+before closing it. Saved fields recover after all tabs close or the server restarts.
+
+`npm test` includes form merge and validation checks. Run the browser checks
+separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.js
 ```
 
 ## Editor presence and connection states

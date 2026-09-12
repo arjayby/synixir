@@ -10,6 +10,7 @@ export default defineConfig({
         kanban: fileURLToPath(new URL("./kanban.html", import.meta.url)),
         whiteboard: fileURLToPath(new URL("./whiteboard.html", import.meta.url)),
         richText: fileURLToPath(new URL("./rich-text.html", import.meta.url)),
+        multiplayerForm: fileURLToPath(new URL("./multiplayer-form.html", import.meta.url)),
       },
     },
   },
