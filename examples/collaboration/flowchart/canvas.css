@@ -1,0 +1,33 @@
+.flowchart-page .flow-node { background: transparent; border: 0; overflow: visible; font-size: 17px; padding: 16px; }
+.flowchart-page .flow-node::before { content: ""; position: absolute; inset: 0; background: inherit; border: 1.5px solid #819b8d; border-radius: 10px; z-index: -1; box-shadow: 0 3px 8px #28332c12; }
+.flowchart-page .flow-node { isolation: isolate; background: none !important; }
+.flowchart-page .flow-node.color-blue::before { background: #d6e7ff; }
+.flowchart-page .flow-node.color-yellow::before { background: #fff0a4; }
+.flowchart-page .flow-node.color-mint::before { background: #d5eedd; }
+.flowchart-page .flow-node.color-rose::before { background: #f9dbe3; }
+.flowchart-page .flow-node.color-white::before { background: #fff; }
+.flowchart-page .object-terminal::before { border-radius: 999px; }
+.flowchart-page .object-decision::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border-radius: 0; }
+.flowchart-page .object-decision { padding: 30px 45px; }
+.flow-node > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.flowchart-page .object-layer { pointer-events: none; z-index: 1; }
+.flowchart-page .flow-node { pointer-events: auto; }
+.edge-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.flow-edge { fill: none; stroke: #648172; stroke-width: 2; }
+.flow-edge-hit { fill: none; stroke: transparent; stroke-width: 18; cursor: pointer; }
+.edge-layer .is-selected .flow-edge { stroke: #216640; stroke-width: 3; }
+.flow-edge-label { font: 13px system-ui, sans-serif; fill: #375745; text-anchor: middle; paint-order: stroke; stroke: #fafcfb; stroke-width: 6; stroke-linejoin: round; cursor: pointer; }
+.flowchart-page .is-connecting .flow-node { cursor: crosshair; }
+.flowchart-page .is-connecting .flow-node:hover { outline: 3px dashed #285c43; outline-offset: 4px; }
+.connect-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; border-top: 1px solid #d6e0d9; margin-top: 16px; padding-top: 16px; }
+.connect-fields > div { flex: 1 1 170px; min-width: 0; }
+.connect-fields input, .connect-fields select { width: 100%; }
+#edge-label { max-width: 450px; }
+.flow-connections { padding: 18px; border-top: 1px solid #d6e0d9; }
+.flow-connections h2 { margin: 0 0 8px; }
+.flow-connections p { color: #52695b; font-size: 14px; margin: 0; }
+#connection-list { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+#connection-list li { max-width: 100%; }
+#connection-list button { text-align: left; overflow-wrap: anywhere; }
+#connection-list [aria-pressed="true"] { background: #deeee4; border-color: #285c43; }
+.flowchart-page #delete-connection { color: #9d3838; }

@@ -1,12 +1,15 @@
 // Interpolate received positions over a little more than the 60 ms presence
 // interval. New targets start from the position currently on screen, so packet
 // timing never restarts a transition from an old network position.
-export function createMotion() {
+export function createMotion({ onPaint = () => {} } = {}) {
   const positions = new Map();
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const duration = 80;
   let frame;
-  const paint = (node, point) => { node.style.transform = `translate3d(${point.x}px, ${point.y}px, 0)`; };
+  const paint = (node, point) => {
+    node.style.transform = `translate3d(${point.x}px, ${point.y}px, 0)`;
+    onPaint(node, point);
+  };
   function tick(time) {
     frame = undefined;
     let pending = false;

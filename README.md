@@ -8,8 +8,9 @@ provides a shared plain text editor with live cursors. A Kanban example adds
 shared cards, drag-and-drop, and card activity. A whiteboard adds sticky notes,
 shapes, live cursors, and selections. A rich-text example adds formatted documents
 with shared selections and character-level editing. A multiplayer form adds shared
-project briefs with field presence and live previews. All examples recover saved state after a
-server crash.
+project briefs with field presence and live previews. A flowchart builder adds
+connected nodes, labeled branches, and live drag previews. All examples recover
+saved state after a server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
 owner/editor/viewer room permissions are implemented. The browser SDK lives in
@@ -301,6 +302,49 @@ separately from `mix test` with:
 
 ```sh
 npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.js
+```
+
+## Try the flowchart builder
+
+Open [127.0.0.1:5173/flowchart.html](http://127.0.0.1:5173/flowchart.html) with the
+same development servers running. Create a room or use an existing one, then open
+another tab to build a workflow together.
+
+- Add process, decision, and start/end nodes. Drag nodes, move them with arrow
+  keys, and edit their labels, colors, and sizes. Zoom and scroll to explore.
+- Select a source node and choose a destination in **Connect to**, or use
+  **Pick on canvas** and click another node. Label branches such as Yes and No.
+- Select an arrow or its entry in **Connections** to edit its label or delete it.
+  Deleting a node removes its attached arrows. One undo restores both.
+- Live cursors, collaborator selections, and drag previews show where teammates
+  are working. Arrows follow the displayed node positions during dragging.
+  Cursor labels use participant colors with white text, matching the whiteboard.
+- Undo and redo affect this tab's changes. Viewers can explore and select nodes
+  and connections, while edits and history controls require editing permission.
+
+The [flowchart model](examples/collaboration/flowchart/model.js) stores nested
+Y.Maps under `flowchart:nodes:v1` and `flowchart:edges:v1`. Fields merge independently;
+concurrent edits to the same field resolve to one value using Y.Map's conflict
+rules. Connections use a key derived from their source and target so concurrent
+creation of the same arrow converges to one connection. Self-connections are
+excluded; reverse connections and multiple outgoing branches are supported.
+Arrows with deleted endpoints stay hidden, including ones created offline during
+a deletion. Undo can restore their endpoints.
+
+The `flowchart` awareness field carries temporary cursor, selection, and drag
+positions. The canvas reuses the whiteboard's motion helper and commits one
+position change per completed drag. Other examples keep separate data and cursor
+fields within the same room. This is a diagram editor; it does not execute workflows
+or automatically route arrows around intervening nodes.
+
+Offline changes remain in the open tab until reconnecting. Wait for **Saved**
+before closing it. Saved nodes and arrows recover after a server restart.
+
+`npm test` includes connection merge, deletion, and undo checks. Run the browser
+checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- flowchart.spec.js
 ```
 
 ## Editor presence and connection states
