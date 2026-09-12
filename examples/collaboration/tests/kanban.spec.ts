@@ -37,11 +37,13 @@ test("cards sync, show presence, move by drag, and undo preserves a teammate's e
   if (!grip) throw new Error("Expected a visible element");
   const destination = await page.locator('[data-column="in-progress"] .column-heading').boundingBox();
   if (!destination) throw new Error("Expected a visible element");
-  // Use a gradual pointer gesture into the visible header. Scrolling the full
-  // tall column into view mid-gesture can cancel native HTML dragging.
+  // The dedicated handle uses dnd-kit pointer sensors, including empty columns.
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 10, grip.y + grip.height / 2);
+  await expect(page.locator('[data-dragging="true"]').first()).toBeVisible();
   await page.mouse.move(destination.x + destination.width / 2, destination.y + 20, { steps: 12 });
+  await expect(page.locator('[data-column="in-progress"]')).toHaveClass(/drop-target/);
   await page.mouse.up();
   await expect(peer.locator('[data-column="in-progress"]')).toContainText("Release checklist");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
@@ -116,10 +118,20 @@ test("viewers can inspect cards but cannot edit, and revocation freezes an open 
     await expect(viewer.getByLabel("Title", { exact: true })).toBeEditable();
     await setRole("viewer");
     await expect(viewer.getByLabel("Title", { exact: true })).not.toBeEditable();
+    await setRole("editor");
+    await viewer.reload();
+    await saved(viewer);
+    await viewer.getByRole("button", { name: "Move card: Read-only review", exact: true }).focus();
+    await viewer.keyboard.press("Space");
+    await expect(viewer.locator('[data-dragging="true"]').first()).toBeVisible();
+    await setRole("viewer");
+    await expect(viewer.locator('[data-dragging="true"]')).toHaveCount(0);
+    await expect(viewer.locator('[data-column="backlog"]')).toContainText("Read-only review");
+    await expect(viewer.locator(".card-grip")).toBeDisabled();
   } finally { await viewerContext.close(); }
 });
 
-test("board navigation stays on Kanban and the layout fits mobile", async ({ page, baseURL }) => {
+test("board navigation stays on Kanban and the layout fits mobile", async ({ page, baseURL }, testInfo) => {
   await register(page.request, baseURL);
   await page.goto(`${baseURL}/kanban.html`);
   const roomId = `navigation-${randomUUID()}`;
@@ -128,16 +140,80 @@ test("board navigation stays on Kanban and the layout fits mobile", async ({ pag
   await expect(page).toHaveURL(`${baseURL}/kanban.html?room=${roomId}`);
   await saved(page);
   await addCard(page, "Mobile planning");
+  await page.screenshot({ path: testInfo.outputPath("kanban-desktop.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await card(page, "Mobile planning").click();
   await page.getByLabel("Status", { exact: true }).selectOption("done");
   await page.getByRole("button", { name: "Close card", exact: true }).click();
   await expect(page.locator('[data-column="done"]')).toContainText("Mobile planning");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("kanban-mobile.png"), fullPage: true });
   await expect(page.getByRole("link", { name: "Try the text editor" })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
   await page.getByRole("link", { name: "All rooms" }).click();
   await expect(page).toHaveURL(`${baseURL}/kanban.html`);
   await page.getByRole("link", { name: `${roomId} · owner`, exact: true }).click();
   await saved(page);
   await expect(card(page, "Mobile planning")).toBeVisible();
+});
+
+
+test("keyboard sorting preserves peer edits during a drag and Escape cancels a move", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url);
+  await saved(page);
+  await addCard(page, "First task");
+  await addCard(page, "Second task");
+  const peer = await context.newPage();
+  await peer.goto(url);
+  await saved(peer);
+  const grip = page.getByRole("button", { name: "Move card: Second task", exact: true });
+  await grip.focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator('[data-dragging="true"]').first()).toBeVisible();
+  await card(peer, "Second task").click();
+  await peer.getByLabel("Description").fill("Updated while the card is moving.");
+  await peer.getByRole("button", { name: "Close card", exact: true }).click();
+  await saved(peer);
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Space");
+  const order = (target: Page) => target.locator('[data-column="backlog"] .card-title');
+  await expect(order(peer)).toHaveText(["Second task", "First task"]);
+  await expect(card(page, "Second task")).toContainText("Updated while the card is moving.");
+  await grip.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Escape");
+  await expect(order(page)).toHaveText(["Second task", "First task"]);
+  await expect(order(peer)).toHaveText(["Second task", "First task"]);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(order(peer)).toHaveText(["First task", "Second task"]);
+  await expect(card(page, "Second task")).toContainText("Updated while the card is moving.");
+});
+
+test("touch handles move cards to an empty column", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url);
+  await saved(page);
+  await addCard(page, "Touch planning");
+  const grip = await page.getByRole("button", { name: "Move card: Touch planning", exact: true }).boundingBox();
+  const target = await page.locator('[data-column="in-progress"] .column-heading').boundingBox();
+  if (!grip || !target) throw new Error("Expected a visible touch handle and drop column");
+  const session = await context.newCDPSession(page);
+  const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+  const to = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+  await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [from] });
+  // The touch sensor waits briefly before lifting a card so ordinary scrolling
+  // elsewhere in the board stays available.
+  await expect(page.locator('[data-dragging="true"]').first()).toBeVisible();
+  for (let step = 1; step <= 12; step++) {
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{
+      x: from.x + (to.x - from.x) * step / 12,
+      y: from.y + (to.y - from.y) * step / 12,
+    }] });
+  }
+  await expect(page.locator('[data-column="in-progress"]')).toHaveClass(/drop-target/);
+  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(page.locator('[data-column="in-progress"]')).toContainText("Touch planning");
+  await saved(page);
+  await session.detach();
 });

@@ -21,7 +21,11 @@
 .card-list { min-height: 100px; display: grid; gap: 12px; align-content: start; }
 .kanban-card { position: relative; min-width: 0; border: 1px solid #d4ded7; border-top: 3px solid #91a499; border-radius: 7px; background: white; box-shadow: 0 2px 3px #19342405; }
 .card-grip { position: absolute; right: 4px; top: 5px; padding: 4px 7px; font-size: 22px; color: #64756c; cursor: grab; user-select: none; }
-.kanban-card[draggable="true"] { cursor: grab; }
+.kanban-card[data-dragging] { opacity: .65; }
+.kanban-board .card-grip { touch-action: none; cursor: grab; }
+.kanban-board .card-grip:active { cursor: grabbing; }
+.kanban-board .card-open { display: block; height: auto; white-space: normal; padding: 12px 36px 12px 12px; }
+.kanban-board .add-card { width: 100%; margin-top: 12px; }
 .kanban-card.card-blue { border-top-color: #497fc1; }
 .kanban-card.card-green { border-top-color: #428461; }
 .kanban-card.card-amber { border-top-color: #b4801e; }
