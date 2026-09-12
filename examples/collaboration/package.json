@@ -6,25 +6,39 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "test": "playwright test"
+    "dev": "node --import tsx dev.ts",
+    "build": "next build",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "playwright test",
+    "predev": "npm run build --workspace @synixir/client"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.0",
     "@codemirror/state": "6.7.4",
     "@codemirror/view": "6.43.11",
     "@synixir/client": "0.1.0",
+    "@tailwindcss/postcss": "4.3.3",
     "@tiptap/core": "3.31.3",
     "@tiptap/extension-collaboration": "3.31.3",
     "@tiptap/pm": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
     "@tiptap/y-tiptap": "3.0.9",
+    "class-variance-authority": "0.7.1",
+    "cn": "0.3.0",
+    "lucide-react": "1.45.0",
+    "next": "16.3.5",
+    "radix-ui": "1.6.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "shadcn": "4.21.0",
+    "tailwindcss": "4.3.3",
+    "tw-animate-css": "1.4.0",
     "y-codemirror.next": "0.3.6",
     "yjs": "13.6.32"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "vite": "8.2.2"
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7"
   }
 }

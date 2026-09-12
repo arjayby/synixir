@@ -16,6 +16,7 @@ defmodule SynixirWeb.ClientController do
 
     if File.regular?(path),
       do: conn |> put_resp_content_type("text/html") |> send_file(200, path),
-      else: send_resp(conn, 404, "Client assets are not built. Use the Vite development server.")
+      else:
+        send_resp(conn, 404, "Client assets are not built. Use the Next.js development server.")
   end
 end

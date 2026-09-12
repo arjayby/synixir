@@ -202,7 +202,9 @@ defmodule Synixir.Script.Database do
           S.run(
             [
               "node",
-              "scripts/operations/load.js"
+              "--import",
+              "tsx",
+              "scripts/operations/load.ts"
               | Enum.map([port, clients, rooms, writes], &to_string/1)
             ],
             env: env

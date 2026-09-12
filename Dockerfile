@@ -19,7 +19,7 @@ COPY config/config.exs config/prod.exs config/
 RUN mix deps.get --only prod --check-locked && mix deps.compile
 COPY lib lib
 COPY priv priv
-COPY --from=client /src/examples/collaboration/dist/ priv/static/
+COPY --from=client /src/examples/collaboration/out/ priv/static/
 RUN mix compile --warnings-as-errors
 COPY config/runtime.exs config/
 RUN mix release

@@ -12,7 +12,9 @@ tarball in your application along with `yjs@^13.6.32`:
 npm install /path/to/synixir-client-0.1.0.tgz yjs@^13.6.32
 ```
 
-Use a browser ESM bundler such as Vite. TypeScript declarations are included.
+The SDK is written in strict TypeScript and ships compiled ESM JavaScript with
+generated declarations. Use it from TypeScript or JavaScript with Next.js, Vite,
+or another browser ESM bundler.
 Importing the module is safe without browser globals; connecting requires browser
 WebSocket/fetch APIs. Outside the browser, supply `serverUrl` when constructing a
 room. Yjs is a shared peer dependency, so applications and editor bindings use
@@ -22,7 +24,7 @@ one copy. Phoenix and the channel provider are private implementation details.
 
 Sign in and create or join a room through your application's account UI first.
 The default access callback uses Synixir's cookie session API. Serve `/api` and
-`/socket` through the frontend origin, as the repository's Vite example does.
+`/socket` through the frontend origin, as the repository's Next.js example does.
 
 ```js
 import { SynixirRoom } from "@synixir/client";

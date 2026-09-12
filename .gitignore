@@ -32,3 +32,10 @@ node_modules/
 # Local staging credentials, certificates, backups and reports.
 /.local/
 __pycache__/
+
+# TypeScript and Next.js build output.
+/packages/client/dist/
+/examples/collaboration/.next/
+/examples/collaboration/out/
+*.tsbuildinfo
+/examples/collaboration/next-env.d.ts

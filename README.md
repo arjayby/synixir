@@ -60,7 +60,7 @@ browser pilot, certificate renewal, backups, and upgrades.
 ## Local setup
 
 Use this setup to develop the Phoenix backend and run the browser examples with
-Vite. It uses a separate database and ports from Docker staging.
+Next.js. It uses a separate database and ports from Docker staging.
 
 - Elixir 1.18.3 and Erlang/OTP 27.3.3, pinned in `.tool-versions` for asdf.
 - A C compiler and `make` for Argon2 password hashing, such as the Xcode Command
@@ -99,7 +99,7 @@ versions in `.tool-versions`. Run the commands below from the project directory.
    ```
 
 The server listens at [localhost:4000](http://localhost:4000), with a collaboration
-WebSocket at `/socket/websocket`. Open the Vite example below for the development
+WebSocket at `/socket/websocket`. Open the Next.js example below for the development
 UI; the Docker release serves the packaged example at `/`. Use
 `iex -S mix phx.server` for an interactive shell.
 
@@ -114,6 +114,11 @@ server, adjust `config/dev.exs` and `config/test.exs` to match its credentials.
 The configured role must be able to create databases.
 
 ## Try the collaboration example
+
+The examples use Next.js App Router, React, TypeScript, shadcn/ui, and Tailwind CSS.
+Elixir/Phoenix remains the backend for accounts, permissions, persistence, and
+WebSockets. The production build exports static pages for Phoenix to serve; no
+Node server is needed in the release. See the [frontend guide](examples/collaboration/README.md).
 
 The browser example uses Node.js 24.12.0, pinned in
 `examples/collaboration/.nvmrc`. Complete local setup above first. Restart
@@ -200,7 +205,7 @@ The production build also includes `/kanban.html`.
 - Offline changes remain in the open tab. Reconnect and wait for **Saved** before
   closing it. Saved boards recover through the existing PostgreSQL document log.
 
-The [board model](examples/collaboration/kanban/model.js) stores each card as a
+The [board model](examples/collaboration/kanban/model.ts) stores each card as a
 nested Y.Map under `kanban:cards:v1`. Column and order are a single placement value,
 so simultaneous moves converge to one location without duplicating a card.
 Edits to different fields merge. Concurrent edits to the same title, description,
@@ -209,7 +214,7 @@ fields do not provide character-level text merging. A deletion wins over a
 concurrent edit to that card. Ordering ties use the card ID. This first example
 has fixed columns and does not support reordering within a column.
 
-The [shared example shell](examples/collaboration/example-shell.js) owns account,
+The [shared React application](examples/collaboration/components/example-app.tsx) owns account,
 room, connection, permission, and cleanup UI for all examples. Each editing
 surface consumes the public SDK. Kanban's data uses a separate shared type, so
 opening a text room as a board does not change its text content.
@@ -221,7 +226,7 @@ recovery, server restart, permissions, room navigation, and mobile layout.
 Run only the Kanban browser checks with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- kanban.spec.js
+npm test --workspace synixir-collaboration-example -- kanban.spec.ts
 ```
 
 ## Try the whiteboard example
@@ -251,7 +256,7 @@ Each example stores its data separately inside that room's Yjs document.
 - Undo and redo affect this tab's changes. Viewers can select objects and publish
   cursors, but cannot change content, geometry, or layer order.
 
-The [whiteboard model](examples/collaboration/whiteboard/model.js) uses nested
+The [whiteboard model](examples/collaboration/whiteboard/model.ts) uses nested
 Y.Maps under `whiteboard:objects:v1`. Position and size are separate atomic values,
 so moving an object does not overwrite a teammate's text or color edits.
 Simultaneous edits to the same property resolve to one value through Y.Map's
@@ -266,7 +271,7 @@ room permissions, PostgreSQL persistence, and recovery flow as the other example
 checks separately from `mix test` with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- whiteboard.spec.js
+npm test --workspace synixir-collaboration-example -- whiteboard.spec.ts
 ```
 
 ## Try the rich-text example
@@ -286,7 +291,7 @@ one. The plain-text editor remains available as its own example.
   Wait for **Saved** before closing the tab. Saved formatting and content recover
   after everyone leaves or the server restarts.
 
-The [rich-text editor](examples/collaboration/rich-text/editor.js) uses Tiptap with
+The [rich-text editor](examples/collaboration/rich-text/editor.ts) uses Tiptap with
 its [Yjs collaboration extension](https://tiptap.dev/docs/editor/extensions/functionality/collaboration).
 It binds to the `rich-text:content:v1` Y.XmlFragment in the SDK's document and uses
 Synixir for synchronization and persistence. It does not require a separate
@@ -301,7 +306,7 @@ storage quotas apply to the whole room.
 Run its browser checks separately from `mix test` with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- rich-text.spec.js
+npm test --workspace synixir-collaboration-example -- rich-text.spec.ts
 ```
 
 ## Try the multiplayer form example
@@ -326,7 +331,7 @@ then open the form in another tab to collaborate on a project brief.
 - Undo and redo affect this tab's edits across text and choice fields. Viewers
   can read, select text, and review the draft; they cannot edit or undo it.
 
-The [form model](examples/collaboration/multiplayer-form/model.js) stores text in
+The [form model](examples/collaboration/multiplayer-form/model.ts) stores text in
 separate top-level Y.Text fields named `multiplayer-form:<field>:v1`, with choices
 in `multiplayer-form:properties:v1`. The text controls reuse the existing
 CodeMirror/Yjs binding for shared selections, composition input, and undo.
@@ -340,7 +345,7 @@ before closing it. Saved fields recover after all tabs close or the server resta
 separately from `mix test` with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.js
+npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.ts
 ```
 
 ## Try the flowchart builder
@@ -361,7 +366,7 @@ another tab to build a workflow together.
 - Undo and redo affect this tab's changes. Viewers can explore and select nodes
   and connections, while edits and history controls require editing permission.
 
-The [flowchart model](examples/collaboration/flowchart/model.js) stores nested
+The [flowchart model](examples/collaboration/flowchart/model.ts) stores nested
 Y.Maps under `flowchart:nodes:v1` and `flowchart:edges:v1`. Fields merge independently;
 concurrent edits to the same field resolve to one value using Y.Map's conflict
 rules. Connections use a key derived from their source and target so concurrent
@@ -383,7 +388,7 @@ before closing it. Saved nodes and arrows recover after a server restart.
 checks separately from `mix test` with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- flowchart.spec.js
+npm test --workspace synixir-collaboration-example -- flowchart.spec.ts
 ```
 
 ## Try the collaborative table
@@ -410,7 +415,7 @@ another tab to work on the same table.
 - Viewers can select and copy cells, but cannot change data, paste, or use undo.
   On mobile, the table scrolls horizontally while the row numbers stay visible.
 
-The [table model](examples/collaboration/table/model.js) uses separate Y.Maps for
+The [table model](examples/collaboration/table/model.ts) uses separate Y.Maps for
 row order, column order, column names, and deletion markers. Default row and column
 IDs are stable and require no initialization writes. Each cell uses a top-level
 Y.Text named `collaborative-table:cell:[row-id,column-id]:v1`, with the IDs encoded
@@ -435,7 +440,7 @@ cells and table structure recover after a server restart.
 browser checks separately from `mix test` with:
 
 ```sh
-npm test --workspace synixir-collaboration-example -- table.spec.js
+npm test --workspace synixir-collaboration-example -- table.spec.ts
 ```
 
 ## Editor presence and connection states
@@ -484,7 +489,7 @@ quotas are described in the [operations guide](docs/operations.md).
 All JSON API routes fetch the session and use CSRF protection. First fetch
 `GET /api/session`, retain its `csrf_token` in memory, and send it as
 `x-csrf-token` for state-changing requests. Retain the returned cookies. Responses
-use `Cache-Control: no-store`. Vite proxies `/api` and `/socket` to Phoenix.
+use `Cache-Control: no-store`. The Next.js development server proxies `/api` and `/socket` to Phoenix.
 The Docker release serves the frontend, API, and WebSockets through one HTTPS
 origin. Production WebSocket origin checks include the scheme and port. Socket
 connections alone carry no identity: each room join must present an authorized
@@ -684,7 +689,7 @@ an explicitly configured higher cap with sufficient server and browser memory.
 A client opts in with `chunked_sync: 1` in its authorized join parameters. The
 join reply includes `transfer` with `max_message_bytes`, `chunk_bytes`,
 `max_transfer_bytes`, and `transfer_timeout_ms`. The SDK's internal
-[chunked-transport.js](packages/client/src/chunked-transport.js) wraps the
+[chunked-transport.ts](packages/client/src/chunked-transport.ts) wraps the
 existing Phoenix channel provider. Clients without this option keep the original
 protocol and per-message size limit.
 
@@ -852,7 +857,7 @@ It does not publish the package. Run browser tests separately from `mix test`;
 both use `synixir_test`.
 
 Playwright migrates the test database and starts its own Phoenix server on port
-4010 and Vite on port 5174, then shuts them down. Those ports must be free;
+4010 and Next.js on port 5174, then shuts them down. Those ports must be free;
 your development servers can keep running on ports 4000 and 5173. Each test uses
 unique room IDs so saved data from previous runs does not affect the assertions.
 The fixture sets `SYNIXIR_BROWSER_TEST=true` for its subprocesses, selecting a

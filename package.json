@@ -2,13 +2,27 @@
   "name": "synixir",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/client", "examples/collaboration"],
-  "engines": { "node": ">=22.12.0" },
-  "scripts": {
-    "test": "npm test --workspace @synixir/client && node --test examples/collaboration/kanban/model.test.js examples/collaboration/whiteboard/model.test.js examples/collaboration/flowchart/model.test.js examples/collaboration/table/model.test.js examples/collaboration/multiplayer-form/model.test.js",
-    "test:package": "node scripts/check-client-package.js",
-    "test:browser": "npm test --workspace synixir-collaboration-example",
-    "build": "npm run build --workspace synixir-collaboration-example"
+  "workspaces": [
+    "packages/client",
+    "examples/collaboration"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
   },
-  "devDependencies": { "typescript": "7.0.2" }
+  "scripts": {
+    "test": "npm test --workspace @synixir/client && node --import tsx --test examples/collaboration/kanban/model.test.ts examples/collaboration/whiteboard/model.test.ts examples/collaboration/flowchart/model.test.ts examples/collaboration/table/model.test.ts examples/collaboration/multiplayer-form/model.test.ts",
+    "test:package": "node --import tsx scripts/check-client-package.ts",
+    "test:browser": "npm test --workspace synixir-collaboration-example --",
+    "build": "npm run build --workspace @synixir/client && npm run build --workspace synixir-collaboration-example",
+    "typecheck": "npm run build --workspace @synixir/client && npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/http-proxy": "1.17.17",
+    "@types/node": "22.20.2",
+    "@types/phoenix": "1.6.7",
+    "http-proxy": "1.18.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
 }
