@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import https from "node:https";
-import { BrowserContext, type Page, type BrowserContextOptions, chromium, expect } from "@playwright/test";
+import { BrowserContext, type Page, type BrowserContextOptions, type APIResponse, chromium, expect } from "@playwright/test";
 import { navigateStaging } from "./support/browser-navigation.ts";
 
 const [mode, baseURL, manifestPath] = process.argv.slice(2);
@@ -107,6 +107,18 @@ try {
       assert.equal((await api(owner.ctx, `/api/rooms/${roomId}/members/${person.username}`, "PUT", { role })).status(), 200);
     }
     const first = await open(owner.ctx, roomId, "owner");
+    // A page's chunk fan-out must not consume the API and WebSocket request budget.
+    const assetPath = await first.locator('script[src^="/_next/static/"]').first().getAttribute("src");
+    assert.ok(assetPath);
+    for (let batch = 0; batch < 15; batch++) {
+      const assets: APIResponse[] = await Promise.all(Array.from({ length: 16 }, () => owner.ctx.request.head(assetPath)));
+      for (const asset of assets) {
+        assert.equal(asset.status(), 200, "static chunk requests must not be rate limited");
+        await asset.dispose();
+      }
+    }
+    assert.equal((await owner.ctx.request.get("/api/session")).status(), 200,
+      "static chunk requests must leave the API request budget available");
     const second = await open(editor.ctx, roomId, "editor");
     const third = await open(viewer.ctx, roomId, "viewer");
     await expect(third.locator(".cm-content")).toHaveAttribute("aria-readonly", "true");

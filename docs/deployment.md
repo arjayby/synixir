@@ -81,9 +81,12 @@ The reproduction, runtime checks and primary sources are in
 The gateway terminates TLS and proxies WebSocket upgrades. It overwrites the
 forwarded scheme and client address, rejects hosts other than `localhost`, bounds
 HTTP bodies to 16 KiB, allows at most 64 active connections per IP, and applies
-30 HTTP requests per second with a burst of 120. Existing channel limits govern
-messages after a WebSocket upgrade. These are staging defaults, not capacity
-measurements. Gateway access logs are disabled to avoid recording grant URLs.
+30 HTTP requests per second with a burst of 120. GET and HEAD requests for
+`/_next/static/` assets are excluded from the request rate limit so loading editor
+bundles leaves the API budget available; the connection limit still applies.
+Existing channel limits govern messages after a WebSocket upgrade. These are
+staging defaults, not capacity measurements. Gateway access logs are disabled to
+avoid recording grant URLs.
 
 The app requires `DATABASE_URL`, `SECRET_KEY_BASE` and an HTTPS origin in
 `SYNIXIR_PUBLIC_URL`. WebSocket origin checks include the scheme and port. Session
