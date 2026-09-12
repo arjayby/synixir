@@ -127,15 +127,19 @@ reachability. CI also validates an actual application scrape using `check metric
 
 ## Back up and verify
 
-Use Python 3.11 or later and PostgreSQL 17 client tools. The examples use the
-repository's PostgreSQL container, `synixir-db-1`. `--docker-container` runs tools
+Use Elixir 1.18+ with Erlang/OTP 27+ and PostgreSQL 17 client tools. The examples
+use the repository's PostgreSQL container, `synixir-db-1`. `--docker-container` runs tools
 inside that specific container against its local database. Omit it to use native
 tools with libpq's `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSFILE` or `PGPASSWORD`.
 
+The CLI uses only standard libraries. Restore verification, drills, and load
+checks also run the application through Mix and require its dependencies.
+Run `elixir scripts/operations_test.exs` to test the standalone script support.
+
 ```sh
-python3 scripts/operations/database.py --docker-container synixir-db-1 backup --database synixir_dev --output /secure/backups/synixir.dump
-python3 scripts/operations/database.py --docker-container synixir-db-1 verify /secure/backups/synixir.dump
-python3 scripts/operations/database.py --docker-container synixir-db-1 drill --output /tmp/synixir-restore.json
+elixir scripts/operations/database.exs --docker-container synixir-db-1 backup --database synixir_dev --output /secure/backups/synixir.dump
+elixir scripts/operations/database.exs --docker-container synixir-db-1 verify /secure/backups/synixir.dump
+elixir scripts/operations/database.exs --docker-container synixir-db-1 drill --output /tmp/synixir-restore.json
 ```
 
 Create the output directory first and choose a new filename on each run. Backups
@@ -186,7 +190,7 @@ external storage policy.
 ## Load check
 
 ```sh
-python3 scripts/operations/database.py --docker-container synixir-db-1 load --clients 12 --rooms 3 --writes 100 --output /tmp/synixir-load.json
+elixir scripts/operations/database.exs --docker-container synixir-db-1 load --clients 12 --rooms 3 --writes 100 --output /tmp/synixir-load.json
 docker run --rm -i --network none --entrypoint promtool prom/prometheus:v3.5.5 check metrics < /tmp/synixir-load.json.prom
 ```
 
