@@ -10,11 +10,22 @@ assert.equal(new URL(baseURL).protocol, "https:");
 const browser = await chromium.launch({ headless: true });
 const contexts = [];
 const pageErrors = [];
+const failedRequests = [];
 const password = randomBytes(24).toString("hex");
 
 async function context(storageState) {
   const value = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, storageState });
-  value.on("page", page => page.on("pageerror", error => pageErrors.push(error.message)));
+  value.on("page", page => {
+    page.on("pageerror", error => pageErrors.push(error.message));
+    page.on("requestfailed", request => failedRequests.push({
+      path: new URL(request.url()).pathname, error: request.failure()?.errorText,
+    }));
+    page.on("response", response => {
+      if (response.status() >= 400) failedRequests.push({
+        path: new URL(response.url()).pathname, status: response.status(),
+      });
+    });
+  });
   contexts.push(value);
   return value;
 }
@@ -42,7 +53,15 @@ async function open(ctx, roomId, role) {
   const response = await page.goto(`/?room=${roomId}`);
   assert.equal(response.status(), 200);
   assert.equal(response.headers()["cache-control"], "no-store");
-  await expect(page.locator("#status")).toHaveText("Connected", { timeout: 15000 });
+  try {
+    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 15000 });
+  } catch (error) {
+    console.error("Pilot connection diagnostics:", JSON.stringify({
+      role, pageErrors, failedRequests: failedRequests.slice(-20),
+      accountError: await page.locator("#account-error").textContent(),
+    }));
+    throw error;
+  }
   await expect(page.locator("#role-label")).toHaveText(role);
   return page;
 }
