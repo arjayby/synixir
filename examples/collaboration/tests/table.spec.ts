@@ -32,6 +32,9 @@ test("table shares same-cell typing, remote carets and selections while preservi
   await page.getByRole("textbox", { name: "Edit A1", exact: true }).fill("Plan "); await saved(page);
   await expect(display(peer, "A1")).toHaveText("Plan ");
   await expect(cell(peer, "A1").locator(".cell-people")).toContainText(user.username);
+  // A collaborator's caret is visible before this peer opens a local editor.
+  await expect(cell(peer, "A1").locator(".cm-ySelectionCaret")).toHaveCount(1);
+  await expect(cell(peer, "A1").locator(".cm-content")).toHaveAttribute("contenteditable", "false");
   await cell(peer, "A1").dblclick();
   await expect(cell(peer, "A1").locator(".cm-ySelectionCaret")).toHaveCount(1);
   await peer.evaluate(() => { window.originalCellEditor = document.querySelector<HTMLElement>('.cm-content')!; });
@@ -101,7 +104,7 @@ test("table merges disconnected edits to one cell and restores data and schema a
   await expect(fresh.getByRole("textbox", { name: "Project name", exact: true }).locator(".cm-placeholder")).toBeVisible();
 });
 
-test("table viewers cannot type, paste, delete or undo; live downgrades and mobile work", async ({ page, browser, baseURL }) => {
+test("table viewers cannot type, paste, delete or undo; live downgrades, revocation and mobile work", async ({ page, browser, baseURL }) => {
   const { roomId, url } = await setup(page, baseURL); await page.goto(url); await saved(page); await edit(page, "A1", "Keep this");
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
@@ -114,6 +117,7 @@ test("table viewers cannot type, paste, delete or undo; live downgrades and mobi
     await expect(viewer.getByLabel("Column name", { exact: true })).not.toBeEditable();
     await expect(viewer.getByRole("button", { name: "Delete column", exact: true })).toBeDisabled();
     await cell(viewer, "A1").dblclick(); await viewer.keyboard.type("Blocked");
+    await expect(cell(page, "A1").locator(".cm-ySelectionCaret")).toHaveCount(1);
     await viewer.getByRole("textbox", { name: "Edit A1", exact: true }).evaluate(node => node.dispatchEvent(new InputEvent("beforeinput", { inputType: "historyUndo", bubbles: true, cancelable: true })));
     await expect(display(viewer, "A1")).toHaveText("Keep this");
     expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -123,6 +127,14 @@ test("table viewers cannot type, paste, delete or undo; live downgrades and mobi
     await viewer.keyboard.type("Blocked"); await viewer.keyboard.press("ControlOrMeta+z");
     await expect(display(viewer, "A1")).toHaveText("Allowed");
     await expect(viewer.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
+    await role("editor"); await viewer.reload(); await saved(viewer);
+    await cell(viewer, "A1").dblclick();
+    await viewer.getByRole("textbox", { name: "Edit A1", exact: true }).fill("Before revocation"); await saved(viewer);
+    expect((await api(page.request, baseURL, `/api/rooms/${roomId}/members/${user.username}`, "DELETE")).ok()).toBe(true);
+    await expect(viewer.locator("#add-row")).toBeDisabled();
+    await viewer.keyboard.type("Blocked"); await viewer.keyboard.press("ControlOrMeta+z");
+    await expect(display(viewer, "A1")).toHaveText("Before revocation");
+    await expect(display(page, "A1")).toHaveText("Before revocation");
   } finally { await context.close(); }
 });
 
@@ -157,4 +169,53 @@ test("empty table carets align with the placeholder and stay scoped to their cel
   await expect(cell(peer, "A1").locator(".cell-people")).toBeVisible();
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(peer.locator(".cell-people:not([hidden])")).toHaveCount(0);
+});
+
+
+test("table resizes and virtualizes a populated grid without discarding an active cell", async ({ page, baseURL }) => {
+  const { url } = await setup(page, baseURL); await page.goto(url); await saved(page);
+  const values = Array.from({ length: 40 }, (_, index) => [
+    `Launch task ${index + 1}`, ["Mina", "Sam", "Alex"][index % 3],
+    index % 3 ? "In progress" : "Ready", `Sep ${14 + index % 15}`,
+    "Product", "High", "Sprint 4", "Review with team",
+  ].join("\t")).join("\n");
+  await paste(page, "A1", values); await saved(page);
+  const grid = page.getByRole("grid", { name: "Shared planning table" });
+  await expect(grid).toHaveAttribute("aria-rowcount", "41");
+  expect(await grid.getByRole("row").count()).toBeLessThan(41);
+  const header = page.getByRole("columnheader", { name: "A · Task", exact: true });
+  const bounds = (await header.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width - 2, bounds.y + 20);
+  await page.mouse.down(); await page.mouse.move(bounds.x + bounds.width + 70, bounds.y + 20); await page.mouse.up();
+  expect((await header.boundingBox())!.width).toBeGreaterThan(bounds.width + 50);
+  await cell(page, "A1").dblclick();
+  await page.evaluate(() => { window.originalCellEditor = document.querySelector<HTMLElement>(".rdg-editor-container .cm-content")!; });
+  await grid.evaluate(node => { node.scrollTop = 2400; node.scrollLeft = 700; });
+  await expect(cell(page, "H40")).toBeVisible();
+  expect(await page.evaluate(() => window.originalCellEditor === document.querySelector(".rdg-editor-container .cm-content"))).toBe(true);
+  await page.keyboard.press("Escape");
+  await grid.evaluate(node => { node.scrollTop = 0; node.scrollLeft = 0; });
+  await expect(cell(page, "A1")).toBeVisible();
+  await page.screenshot({ path: "/tmp/synixir-table-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "/tmp/synixir-table-mobile.png", fullPage: true });
+});
+
+
+test("table selection follows cell IDs when a peer deletes an earlier row or column", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL); await page.goto(url); await saved(page);
+  const peer = await context.newPage(); await peer.goto(url); await saved(peer);
+  await edit(page, "B2", "Stable cell");
+  const original = await cell(page, "B2").getAttribute("data-cell");
+  await cell(page, "B2").dblclick();
+  await cell(peer, "A1").click(); await peer.getByRole("button", { name: "Delete row", exact: true }).click();
+  await expect(page.locator("#cell-address")).toHaveText("B1");
+  await expect(cell(page, "B1")).toHaveAttribute("data-cell", original!);
+  await cell(peer, "A1").click(); await peer.getByRole("button", { name: "Delete column", exact: true }).click();
+  await expect(page.locator("#cell-address")).toHaveText("A1");
+  await expect(cell(page, "A1")).toHaveAttribute("data-cell", original!);
+  await page.getByRole("button", { name: "Clear cell", exact: true }).click();
+  await expect(display(peer, "A1")).toHaveText("");
+  await peer.close();
 });
