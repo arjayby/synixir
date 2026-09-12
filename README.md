@@ -6,7 +6,8 @@ Channels. Each room has its own document process backed by a PostgreSQL update
 log, and clients need a signed room access token to join. The browser example
 provides a shared plain text editor with live cursors. A Kanban example adds
 shared cards, drag-and-drop, and card activity. A whiteboard adds sticky notes,
-shapes, live cursors, and selections. All examples recover saved state after a
+shapes, live cursors, and selections. A rich-text example adds formatted documents
+with shared selections and character-level editing. All examples recover saved state after a
 server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
@@ -168,7 +169,7 @@ concurrent edit to that card. Ordering ties use the card ID. This first example
 has fixed columns and does not support reordering within a column.
 
 The [shared example shell](examples/collaboration/example-shell.js) owns account,
-room, connection, permission, and cleanup UI for both examples. Each editing
+room, connection, permission, and cleanup UI for all examples. Each editing
 surface consumes the public SDK. Kanban's data uses a separate shared type, so
 opening a text room as a board does not change its text content.
 
@@ -186,7 +187,7 @@ npm test --workspace synixir-collaboration-example -- kanban.spec.js
 
 Open [127.0.0.1:5173/whiteboard.html](http://127.0.0.1:5173/whiteboard.html) with the
 same development servers running. Sign in and create a room, or open an existing
-one. Links between the text editor, Kanban board, and whiteboard retain the room.
+one. Links between the examples retain the room.
 Each example stores its data separately inside that room's Yjs document.
 
 - Add sticky notes, rectangles, and ellipses. Select an object to edit its text,
@@ -225,6 +226,41 @@ checks separately from `mix test` with:
 
 ```sh
 npm test --workspace synixir-collaboration-example -- whiteboard.spec.js
+```
+
+## Try the rich-text example
+
+Open [127.0.0.1:5173/rich-text.html](http://127.0.0.1:5173/rich-text.html) with the
+same development servers running. Sign in and create a room, or open an existing
+one. The plain-text editor remains available as its own example.
+
+- Write paragraphs, three levels of headings, bullet and numbered lists, and quotes.
+- Apply bold, italic, underline, and links to selected text. The link dialog accepts
+  HTTP and HTTPS URLs and can update or remove an existing link.
+- See collaborators' carets and selected text in their participant colors. Undo
+  and redo affect edits made in this tab, leaving other participants' edits intact.
+- Viewers can read and select text. Editing, formatting, and history commands are
+  disabled for viewers and when access is revoked.
+- Edits made while disconnected remain in the open tab and merge when it reconnects.
+  Wait for **Saved** before closing the tab. Saved formatting and content recover
+  after everyone leaves or the server restarts.
+
+The [rich-text editor](examples/collaboration/rich-text/editor.js) uses Tiptap with
+its [Yjs collaboration extension](https://tiptap.dev/docs/editor/extensions/functionality/collaboration).
+It binds to the `rich-text:content:v1` Y.XmlFragment in the SDK's document and uses
+Synixir for synchronization and persistence. It does not require a separate
+collaboration service. Tiptap's ordinary history is disabled in favor of Yjs undo.
+A small awareness adapter uses `richTextCursor` so plain-text and rich-text cursor
+positions never get mixed when both examples are open in the same room.
+
+This is a text document example, with no images, file uploads, comments, or version
+history. Each example has separate content within the room, while access and
+storage quotas apply to the whole room.
+
+Run its browser checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- rich-text.spec.js
 ```
 
 ## Editor presence and connection states
@@ -617,7 +653,7 @@ only that room's data. PostgreSQL is required. Test partitions append
 `MIX_TEST_PARTITION` to the test database name.
 
 Install JavaScript dependencies from the root workspace lockfile, then check the
-SDK and both browser examples:
+SDK and browser examples:
 
 ```sh
 npm ci
