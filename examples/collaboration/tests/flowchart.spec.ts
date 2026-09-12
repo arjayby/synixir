@@ -224,3 +224,46 @@ test("React Flow handles connect nodes, resize once per gesture, and pan without
   expect(await page.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(beforeDocument);
   await peer.close();
 });
+
+for (const reducedMotion of [false, true]) test(`flowchart interpolates sparse remote cursor updates, reduced motion=${reducedMotion}`, async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url); await saved(page);
+  const peer = await context.newPage();
+  await peer.emulateMedia({ reducedMotion: reducedMotion ? "reduce" : "no-preference" });
+  await peer.goto(url); await saved(peer);
+  await page.locator('#whiteboard-viewport').scrollIntoViewIfNeeded();
+  const box = (await page.locator('#whiteboard-viewport').boundingBox())!;
+  await page.mouse.move(box.x + 250, box.y + 300);
+  await expect(peer.locator('.remote-cursor')).toBeVisible();
+  await expect.poll(async () => (await position(peer.locator('.remote-cursor'))).x).toBeCloseTo(250, 0);
+  const docBefore = await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()));
+  const samples = peer.evaluate(async () => {
+    const points: { x: number; time: number }[] = [];
+    let received: number | undefined;
+    const started = performance.now();
+    while (performance.now() - started < 300) {
+      await new Promise(requestAnimationFrame);
+      const time = performance.now();
+      const remote = [...window.synixirTest.room!.awareness.getStates()]
+        .find(([id]) => id !== window.synixirTest.room!.awareness.clientID)?.[1];
+      if (received === undefined && remote?.flowchart?.cursor?.x === 450) received = time;
+      const cursor = document.querySelector('.remote-cursor');
+      if (cursor) points.push({ x: new DOMMatrixReadOnly(getComputedStyle(cursor).transform).m41, time });
+    }
+    return { points, received };
+  });
+  await page.mouse.move(box.x + 450, box.y + 300);
+  const { points, received } = await samples;
+  const intermediate = new Set(points.filter(point => point.x > 250.5 && point.x < 449.5).map(point => Math.round(point.x * 10)));
+  if (reducedMotion) expect(intermediate.size).toBe(0);
+  else expect(intermediate.size, `Cursor must animate between awareness packets; sampled x=${JSON.stringify(points)}`).toBeGreaterThanOrEqual(2);
+  expect(points.at(-1)?.x).toBeCloseTo(450, 0);
+  expect(received).toBeDefined();
+  const settled = points.find(point => Math.abs(point.x - 450) < 0.5)!;
+  const delay = settled.time - received!;
+  expect(delay, "Cursor should settle promptly after the received update").toBeLessThan(150);
+  console.log(`flowchart cursor: ${intermediate.size} intermediate positions, ${Math.round(delay)}ms to settle, reduced motion=${reducedMotion}`);
+  expect(await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(docBefore);
+  await page.mouse.move(box.x + 250, box.y - 20);
+  await expect(peer.locator('.remote-cursor')).toHaveCount(0);
+});

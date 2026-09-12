@@ -30,7 +30,10 @@ mutation paths.
 `presence.ts` sends cursor, selected node, and drag previews through Synixir
 awareness at most once per 60 ms. Remote drag positions interpolate over 80 ms,
 respecting reduced motion. Arrows read the same React Flow node positions as the
-canvas so they stay attached during interpolation. Viewports remain local.
+canvas so they stay attached during interpolation. Remote cursors interpolate
+through the shared `lib/cursor-motion.ts` helper over 60 ms, without rebuilding
+the graph or writing to Yjs. Reduced-motion and hidden tabs use the received
+position directly. Viewports remain local.
 Synixir continues to own room access, offline edits, reconnect, and persistence.
 
 The implementation follows the public [custom-node API](https://reactflow.dev/learn/customization/custom-nodes),

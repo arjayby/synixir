@@ -36,7 +36,12 @@ room, including as a viewer, does not write migration updates or add undo items.
 ## Presence and permissions
 
 Pointers and selected element IDs use the `whiteboard` awareness field and
-Excalidraw's collaborator renderer. Presence never enters the scene document.
+Excalidraw's collaborator renderer. The first movement after idle publishes
+immediately; subsequent movements coalesce at 60 ms intervals. Remote cursors
+interpolate over 60 ms through `lib/cursor-motion.ts`, shared with the flowchart.
+Reduced-motion and hidden tabs use the received position directly. Cursor-only
+callbacks skip scene diffing and Yjs transactions when element revisions have
+not changed. Presence never enters the scene document.
 The adapter clears the pointer on exit/blur, removes disconnected peers, and
 cleans up subscriptions when leaving the room. Excalidraw view mode follows the
 SDK's read-only flag, including live access revocation. The first received scene

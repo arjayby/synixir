@@ -7,6 +7,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { Collaborator, ExcalidrawImperativeAPI, ExcalidrawProps, SocketId } from "@excalidraw/excalidraw/types";
 import type { SynixirRoom } from "@synixir/client";
 import { createWhiteboardModel, sameScene } from "./model.ts";
+import { createCursorMotion } from "../lib/cursor-motion.ts";
 
 declare global { interface Window { synixirWhiteboardTest?: ExcalidrawImperativeAPI } }
 const cloneScene = (scene: readonly ExcalidrawElement[]): ExcalidrawElement[] => JSON.parse(JSON.stringify(scene));
@@ -33,6 +34,10 @@ export function createWhiteboard(room: SynixirRoom) {
   let pendingFrame: number | undefined;
   let presenceTimer: ReturnType<typeof setTimeout> | undefined;
   let lastPresence = "";
+  let lastPublished = -Infinity;
+  let peerTargets = new Map<SocketId, Collaborator>();
+  let lastPeers = "";
+  const cursorMotion = createCursorMotion<SocketId>(paintCollaborators);
   let pointer: { x: number; y: number; tool: "pointer" | "laser" } | null = null;
   let button: "up" | "down" = "up";
   let selectedElementIds: Record<string, boolean> = {};
@@ -82,12 +87,24 @@ export function createWhiteboard(room: SynixirRoom) {
     const encoded = JSON.stringify(state);
     if (encoded === lastPresence) return;
     lastPresence = encoded;
+    lastPublished = performance.now();
     room.awareness.setLocalStateField("whiteboard", state);
   }
   function schedulePresence() {
-    if (presenceTimer === undefined) presenceTimer = setTimeout(publish, 60);
+    if (presenceTimer !== undefined) return;
+    const delay = 60 - (performance.now() - lastPublished);
+    if (delay <= 0) publish(); else presenceTimer = setTimeout(publish, delay);
   }
   function clearPointer() { pointer = null; button = "up"; publish(); }
+  function paintCollaborators() {
+    if (disposed || !api || !initialized) return;
+    const peers = new Map<SocketId, Collaborator>();
+    for (const [id, peer] of peerTargets) {
+      const point = cursorMotion.get(id);
+      peers.set(id, { ...peer, ...(point ? { pointer: { ...point, tool: "pointer" as const } } : {}) });
+    }
+    api.updateScene({ collaborators: peers, captureUpdate: CaptureUpdateAction.NEVER });
+  }
   function collaborators() {
     if (disposed || !api || !initialized) return;
     const peers = new Map<SocketId, Collaborator>();
@@ -106,7 +123,12 @@ export function createWhiteboard(room: SynixirRoom) {
           ? { pointer: { x: remote.pointer.x, y: remote.pointer.y, tool: "pointer" as const } } : {}),
       });
     }
-    api.updateScene({ collaborators: peers, captureUpdate: CaptureUpdateAction.NEVER });
+    const encoded = JSON.stringify([...peers]);
+    if (encoded === lastPeers) return;
+    lastPeers = encoded;
+    peerTargets = peers;
+    cursorMotion.update(new Map([...peers].flatMap(([id, peer]) => peer.pointer ? [[id, peer.pointer] as const] : [])));
+    paintCollaborators();
   }
   room.awareness.on("change", collaborators);
   const stopState = room.subscribe(collaborators);
@@ -119,6 +141,12 @@ export function createWhiteboard(room: SynixirRoom) {
       selectedElementIds = { ...selected };
       schedulePresence();
     }
+    // Excalidraw calls onChange for cursor/app-state updates too. Element
+    // revisions change on edits, so presence frames need no scene diff or Yjs
+    // transaction. Compare each revision, including order, without hashing it.
+    const unchanged = elements.length === previous.length && elements.every((element, index) =>
+      element.id === previous[index].id && element.version === previous[index].version && element.versionNonce === previous[index].versionNonce);
+    if (unchanged) return;
     if (readOnly) { if (!sameScene(elements, previous)) schedulePaint(); return; }
     // File import and image insertion are disabled. Also reject clipboard,
     // library, and keyboard paths which may bypass the visible tool options.
@@ -196,6 +224,7 @@ export function createWhiteboard(room: SynixirRoom) {
   function destroy() {
     disposed = true;
     clearTimeout(presenceTimer);
+    cursorMotion.destroy();
     if (pendingFrame !== undefined) cancelAnimationFrame(pendingFrame);
     stopModel(); stopState();
     room.awareness.off("change", collaborators);

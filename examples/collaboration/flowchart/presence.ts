@@ -2,6 +2,7 @@ import type { SynixirRoom } from "@synixir/client";
 import type { Point } from "../lib/canvas-data.ts";
 import type { FlowchartAdapter } from "./adapter.ts";
 import { canvasSize } from "./model.ts";
+import { createCursorMotion } from "../lib/cursor-motion.ts";
 
 export interface FlowPeer { id: number; name: string; color: string; selectedId: string | null; cursor: Point | null; drag: (Point & { id: string }) | null }
 function validPoint(value: unknown): value is Point {
@@ -12,6 +13,7 @@ function validPoint(value: unknown): value is Point {
 
 export function createFlowchartPresence(room: SynixirRoom, adapter: FlowchartAdapter) {
   let peers: FlowPeer[] = [];
+  let targets: FlowPeer[] = [];
   let cursor: Point | null = null;
   let disposed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -19,6 +21,11 @@ export function createFlowchartPresence(room: SynixirRoom, adapter: FlowchartAda
   let lastPublished = -Infinity;
   let queued = "", published = "";
   const listeners = new Set<() => void>();
+  const cursorMotion = createCursorMotion<number>(paintCursors);
+  function paintCursors() {
+    peers = targets.map(peer => ({ ...peer, cursor: cursorMotion.get(peer.id) ?? null }));
+    for (const listener of listeners) listener();
+  }
   const motion = new Map<string, { from: Point; current: Point; target: Point; start: number }>();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const localState = () => {
@@ -55,7 +62,7 @@ export function createFlowchartPresence(room: SynixirRoom, adapter: FlowchartAda
   }
   function readPeers() {
     if (disposed) return;
-    peers = room.state.connection === "connected" ? [...room.awareness.getStates()]
+    targets = room.state.connection === "connected" ? [...room.awareness.getStates()]
       .filter(([id, state]) => id !== room.awareness.clientID && state.flowchart && typeof state.flowchart === "object")
       .sort(([a], [b]) => a - b).map(([id, state]) => {
         const flow = state.flowchart;
@@ -65,22 +72,23 @@ export function createFlowchartPresence(room: SynixirRoom, adapter: FlowchartAda
           cursor: validPoint(flow.cursor) ? flow.cursor : null,
           drag: validPoint(flow.drag) && "id" in flow.drag && typeof flow.drag.id === "string" ? flow.drag as Point & { id: string } : null };
       }) : [];
+    cursorMotion.update(new Map(targets.flatMap(peer => peer.cursor ? [[peer.id, peer.cursor] as const] : [])));
     const items = adapter.getSnapshot().items;
-    const targets = new Map<string, Point>();
-    for (const peer of peers) if (peer.drag) {
+    const dragTargets = new Map<string, Point>();
+    for (const peer of targets) if (peer.drag) {
       const item = items.find(item => item.id === peer.drag!.id);
-      if (item) targets.set(item.id, adapter.model.boundedPosition(peer.drag, item.size));
+      if (item) dragTargets.set(item.id, adapter.model.boundedPosition(peer.drag, item.size));
     }
     let changed = false;
-    for (const id of motion.keys()) if (!targets.has(id)) { motion.delete(id); changed = true; }
-    for (const [id, target] of targets) {
+    for (const id of motion.keys()) if (!dragTargets.has(id)) { motion.delete(id); changed = true; }
+    for (const [id, target] of dragTargets) {
       const previous = motion.get(id);
       if (previous?.target.x === target.x && previous.target.y === target.y) continue;
       const from = previous?.current ?? items.find(item => item.id === id)!.position;
       motion.set(id, { from, current: from, target, start: performance.now() }); changed = true;
     }
     if (changed && frame === undefined) frame = requestAnimationFrame(tick);
-    for (const listener of listeners) listener();
+    paintCursors();
   }
   const unsubscribeGraph = adapter.subscribe(schedulePublish);
   room.awareness.on("change", readPeers);
@@ -97,7 +105,7 @@ export function createFlowchartPresence(room: SynixirRoom, adapter: FlowchartAda
       disposed = true; clearTimeout(timer); if (frame !== undefined) cancelAnimationFrame(frame);
       unsubscribeGraph(); unsubscribeRoom(); room.awareness.off("change", readPeers);
       reduced.removeEventListener("change", settle); document.removeEventListener("visibilitychange", settle);
-      listeners.clear(); motion.clear(); room.awareness.setLocalStateField("flowchart", null);
+      cursorMotion.destroy(); listeners.clear(); motion.clear(); room.awareness.setLocalStateField("flowchart", null);
     },
   };
 }
