@@ -297,8 +297,12 @@ export function createWhiteboard(room) {
         if (!pair.pointer) {
           pair.pointer = document.createElement("div");
           pair.pointer.className = "remote-cursor";
-          const arrow = document.createElement("span");
-          arrow.textContent = "↖";
+          const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          arrow.setAttribute("viewBox", "0 0 28 28");
+          arrow.setAttribute("aria-hidden", "true");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", "M1.5 1.5 26.5 10.5 16 15 11 26.5Z");
+          arrow.append(path);
           pair.pointer.append(arrow, document.createElement("span"));
           presenceLayer.append(pair.pointer);
         }
