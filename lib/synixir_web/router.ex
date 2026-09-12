@@ -5,6 +5,10 @@ defmodule SynixirWeb.Router do
   get "/sdk.html", SynixirWeb.ClientController, :settings
   get "/kanban.html", SynixirWeb.ClientController, :kanban
   get "/whiteboard.html", SynixirWeb.ClientController, :whiteboard
+  get "/rich-text.html", SynixirWeb.ClientController, :rich_text
+  get "/multiplayer-form.html", SynixirWeb.ClientController, :multiplayer_form
+  get "/flowchart.html", SynixirWeb.ClientController, :flowchart
+  get "/table.html", SynixirWeb.ClientController, :table
 
   # Probe and scrape requests do not create sessions or need CSRF state.
   get "/health/live", SynixirWeb.OperationsController, :live
