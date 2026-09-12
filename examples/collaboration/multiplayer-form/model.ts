@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { z } from "zod";
 
 export interface FormValues { name: string; goal: string; audience: string; team: string; date: string; priority: string; channels: string[] }
 export const textFields = [
@@ -18,14 +19,29 @@ function validDate(value: string) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+const textSchema = (field: typeof textFields[number]) => z.string()
+  .refine(value => value.trim().length > 0, `${field.label} is required.`)
+  .max(field.max, `Use ${field.max} characters or fewer.`);
+
+// This schema validates a reviewable brief. Shared Y.Text drafts deliberately
+// accept incomplete and over-limit text, and validation never rewrites it.
+export const briefSchema = z.object({
+  name: textSchema(textFields[0]),
+  goal: textSchema(textFields[1]),
+  audience: textSchema(textFields[2]),
+  team: z.string().refine(value => teams.includes(value), "Choose a team."),
+  date: z.string().refine(validDate, "Choose a valid date."),
+  priority: z.string().refine(value => priorities.includes(value), "Choose a priority."),
+  channels: z.array(z.string().refine(value => channels.includes(value), "Choose a launch channel.")),
+});
+
 export function validate(values: Omit<FormValues, "priority" | "channels"> & Partial<Pick<FormValues, "priority" | "channels">>) {
+  const result = briefSchema.safeParse({ priority: "Normal", channels: [], ...values });
   const errors: Record<string, string> = {};
-  for (const field of textFields) {
-    if (!values[field.id].trim()) errors[field.id] = `${field.label} is required.`;
-    else if (values[field.id].length > field.max) errors[field.id] = `Use ${field.max} characters or fewer.`;
+  if (!result.success) for (const issue of result.error.issues) {
+    const field = String(issue.path[0]);
+    errors[field] ??= issue.message;
   }
-  if (!teams.includes(values.team)) errors.team = "Choose a team.";
-  if (!validDate(values.date)) errors.date = "Choose a valid date.";
   return errors;
 }
 

@@ -14,22 +14,21 @@
 .brief-section h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 24px; font-size: 15px; font-weight: 600; }
 .brief-section h3 > span { color: #67826b; font-size: 11px; font-variant-numeric: tabular-nums; padding: 4px 6px; border: 1px solid #d7e1d4; border-radius: 5px; }
 .brief-field { min-width: 0; }
-#text-fields .brief-field + .brief-field { margin-top: 22px; }
 .field-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 12px; margin-bottom: 8px; }
 .field-heading label { font-size: 13px; font-weight: 600; margin: 0; }
 .required-marker { color: #6b7a70; }
 .field-people { color: var(--peer-color); font-size: 11px; line-height: 1.5; max-width: 100%; overflow-wrap: anywhere; }
-.brief-field select, .brief-field input[type="date"] { width: 100%; font-size: 14px; padding: 11px 12px; }
+.brief-field select, .brief-field input[type="date"] { min-height: 44px; }
 .brief-text { border: 1px solid #b6c2b9; border-radius: 6px; background: #fff; }
 #editor .brief-text .cm-editor { min-height: 96px; font-size: 14px; border-radius: 6px; }
 #editor .brief-text .cm-content { min-height: 96px; padding: 10px 12px; }
 #editor .brief-name .cm-editor, #editor .brief-name .cm-content { min-height: 44px; }
 #editor .brief-text .cm-scroller { line-height: 1.65; }
 #editor .brief-text .cm-editor.cm-focused { outline: 2px solid #357c63; outline-offset: -1px; }
-.brief-field.has-collaborator .brief-text, .brief-field.has-collaborator > select, .brief-field.has-collaborator > input { border-color: var(--peer-color); box-shadow: 0 0 0 1px var(--peer-color); }
+.brief-field.has-collaborator .brief-text, .brief-field.has-collaborator select, .brief-field.has-collaborator > input { border-color: var(--peer-color); box-shadow: 0 0 0 1px var(--peer-color); }
 .brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 20px; }
-.channel-options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.channel-option { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border: 1px solid #cbd5ca; border-radius: 7px; font-size: 13px; cursor: pointer; }
+.channel-options { display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; }
+.channel-option { display: flex; width: auto; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border: 1px solid #cbd5ca; border-radius: 7px; font-size: 13px; cursor: pointer; }
 .channel-option:has(:checked) { border-color: #6a9979; background: #eff6ed; }
 .channel-option input { width: 16px; height: 16px; margin: 0; accent-color: #245e48; }
 .channel-option:has(:disabled) { cursor: default; }
