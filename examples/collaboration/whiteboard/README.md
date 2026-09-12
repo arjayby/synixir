@@ -57,7 +57,8 @@ The `0.18.1` package currently pulls `nanoid` `3.3.3` and `4.0.2`, and
 `lodash-es` `4.17.21`. npm audit reports advisories in those transitive
 dependencies. Parent-scoped and version-qualified npm overrides did not change
 the resolved workspace dependencies, including after a clean install; no
-ineffective override is retained.
+ineffective override is retained. npm tracks this workspace resolution behavior
+in [npm/cli#9659](https://github.com/npm/cli/issues/9659).
 
 ## Verification
 
