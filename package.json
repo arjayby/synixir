@@ -10,7 +10,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "test": "npm test --workspace @synixir/client && node --import tsx --test examples/collaboration/kanban/model.test.ts examples/collaboration/whiteboard/model.test.ts examples/collaboration/flowchart/model.test.ts examples/collaboration/table/model.test.ts examples/collaboration/multiplayer-form/model.test.ts",
+    "test": "npm test --workspace @synixir/client && node --import tsx --test examples/collaboration/kanban/model.test.ts examples/collaboration/whiteboard/model.test.ts examples/collaboration/flowchart/model.test.ts examples/collaboration/table/model.test.ts examples/collaboration/multiplayer-form/model.test.ts scripts/support/browser-navigation.test.ts",
     "test:package": "node --import tsx scripts/check-client-package.ts",
     "test:browser": "npm test --workspace synixir-collaboration-example --",
     "build": "npm run build --workspace @synixir/client && npm run build --workspace synixir-collaboration-example",

@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import https from "node:https";
 import { BrowserContext, type Page, type BrowserContextOptions, chromium, expect } from "@playwright/test";
+import { navigateStaging } from "./support/browser-navigation.ts";
 
 const [mode, baseURL, manifestPath] = process.argv.slice(2);
 assert.equal(new URL(baseURL).hostname, "localhost", "pilot is restricted to local staging");
@@ -53,7 +54,7 @@ async function account(role: string) {
 
 async function open(ctx: BrowserContext, roomId: string, role: string|RegExp|readonly (string|RegExp)[]) {
   const page = await ctx.newPage();
-  const response = await page.goto(`/?room=${roomId}`);
+  const response = await navigateStaging(page, `/?room=${roomId}`);
   assert.ok(response);
   assert.equal(response.status(), 200);
   assert.equal(response.headers()["cache-control"], "no-store");
@@ -133,13 +134,13 @@ try {
     assert.equal(denied.status(), 403);
 
     const settings = await owner.ctx.newPage();
-    await settings.goto(`/sdk.html?room=${roomId}`);
+    await navigateStaging(settings, `/sdk.html?room=${roomId}`);
     await expect(settings.locator("#sdk-state")).toHaveText("connected · saved", { timeout: 15000 });
     await settings.locator("#sdk-title").fill("Packaged SDK settings");
     await expect(settings.locator("#sdk-state")).toHaveText("connected · saved");
     // Exercise every exported route and its lazy-loaded editor bundle in the release.
     for (const route of ["kanban", "whiteboard", "rich-text", "multiplayer-form", "flowchart", "table"]) {
-      await settings.goto(`/${route}.html?room=${roomId}`);
+      await navigateStaging(settings, `/${route}.html?room=${roomId}`);
       await expect(settings.locator("#status")).toHaveText("Connected", { timeout: 15000 });
       await expect(settings.locator("#editor")).toBeVisible();
     }
@@ -181,7 +182,7 @@ try {
     const owner = manifest.accounts.owner;
     assert.equal((await api(ctx, "/api/session", "POST", { username: owner.username, password: owner.password })).status(), 200);
     const settings = await ctx.newPage();
-    await settings.goto(`/sdk.html?room=${manifest.roomId}`);
+    await navigateStaging(settings, `/sdk.html?room=${manifest.roomId}`);
     await expect(settings.locator("#sdk-state")).toHaveText("connected · saved", { timeout: 15000 });
     await expect(settings.locator("#sdk-title")).toHaveValue(manifest.title);
     console.log("Pilot passed after replacement: sessions, passwords, permissions, document and SDK state retained");
@@ -189,6 +190,11 @@ try {
     throw new Error("Expected seed or verify");
   }
   assert.deepEqual(pageErrors, [], "browser JavaScript errors");
+} catch (error) {
+  console.error("Pilot browser diagnostics:", JSON.stringify({
+    pageErrors, failedRequests: failedRequests.slice(-20),
+  }));
+  throw error;
 } finally {
   await Promise.allSettled(contexts.map(ctx => ctx.close()));
   await browser.close();
