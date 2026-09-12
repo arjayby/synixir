@@ -6,6 +6,10 @@ document updates in PostgreSQL, and shares live presence between participants.
 Use the JavaScript SDK to connect your own application, or try the included
 CodeMirror editor and shared settings examples.
 
+Six more examples cover Kanban boards, whiteboards, rich-text editing, multiplayer
+forms, flowchart builders, and collaborative tables. They share room permissions,
+participant presence, undo, and recovery of saved state after a server crash.
+
 - Durable document updates, snapshots, compaction, and recovery after a server crash.
 - Live cursors and participant presence, with reconnect support and local undo.
 - Accounts, expiring sessions, and owner/editor/viewer room permissions.
@@ -41,7 +45,7 @@ python3 scripts/staging.py up
 ```
 
 Open [https://localhost:8443](https://localhost:8443), accept the local self-signed
-certificate, and create an account and room. The release includes both browser
+certificate, and create an account and room. The release includes all browser
 examples and uses its own PostgreSQL volume and private Prometheus collector.
 Docker builds Elixir, Erlang, and the frontend inside the image.
 
@@ -175,6 +179,264 @@ installation, connection and save states, cancellation, cleanup, and custom
 access callbacks. `/sdk.html?room=<room_id>` provides a second small consumer
 that synchronizes a title in a Y.Map without CodeMirror. It uses the same signed-in
 account and room membership as the editor.
+
+## Try the Kanban example
+
+Open [127.0.0.1:5173/kanban.html](http://127.0.0.1:5173/kanban.html) with the same
+development servers running. Sign in and create a board, or open an existing room.
+The text editor and board link to each other and share account and room access.
+The production build also includes `/kanban.html`.
+
+- Add cards to Backlog, In progress, or Done. Open a card to edit its title,
+  description, color, and status. Changes save as you type.
+- Drag cards between columns, or use the status selector with a keyboard or on
+  a touch device. Moved cards go to the end of the destination column.
+- Open the same board in two tabs to see changes and card activity. To collaborate
+  with another account, grant its username access under **Manage access**.
+- Undo and redo affect this tab's local changes. Deleted cards can be restored
+  with Undo. Viewers can inspect cards and publish presence, but cannot edit them.
+- Offline changes remain in the open tab. Reconnect and wait for **Saved** before
+  closing it. Saved boards recover through the existing PostgreSQL document log.
+
+The [board model](examples/collaboration/kanban/model.js) stores each card as a
+nested Y.Map under `kanban:cards:v1`. Column and order are a single placement value,
+so simultaneous moves converge to one location without duplicating a card.
+Edits to different fields merge. Concurrent edits to the same title, description,
+color, or placement resolve through Y.Map's conflict rules to one value; these
+fields do not provide character-level text merging. A deletion wins over a
+concurrent edit to that card. Ordering ties use the card ID. This first example
+has fixed columns and does not support reordering within a column.
+
+The [shared example shell](examples/collaboration/example-shell.js) owns account,
+room, connection, permission, and cleanup UI for all examples. Each editing
+surface consumes the public SDK. Kanban's data uses a separate shared type, so
+opening a text room as a board does not change its text content.
+
+`npm test` includes model checks for concurrent creation, moves, deletion, and
+local undo. The browser suite includes Kanban sync, presence, dragging, offline
+recovery, server restart, permissions, room navigation, and mobile layout.
+
+Run only the Kanban browser checks with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- kanban.spec.js
+```
+
+## Try the whiteboard example
+
+Open [127.0.0.1:5173/whiteboard.html](http://127.0.0.1:5173/whiteboard.html) with the
+same development servers running. Sign in and create a room, or open an existing
+one. Links between the examples retain the room.
+Each example stores its data separately inside that room's Yjs document.
+
+- Add sticky notes, rectangles, and ellipses. Select an object to edit its text,
+  color, width, or height, bring it to the front, or delete it.
+- Drag objects with a mouse or touch. Arrow keys move the selected object one
+  canvas pixel; Shift + arrows move it ten. Escape cancels an active drag.
+- Scroll around the fixed 1600 × 1000 canvas. Zoom controls range from 50% to
+  150%; zoom and scroll are local to each tab.
+- Teammates see cursors, selection outlines, and live movement previews. Presence
+  labels are client-supplied and do not establish identity or lock objects.
+- Remote cursors and drag previews interpolate between presence updates with
+  an 80 ms animation. Local dragging updates on the next animation frame without
+  interpolation. Reduced-motion preferences disable interpolation. Cursor updates
+  reuse existing activity elements and do not rebuild the participant list or
+  edit controls. Presence still sends at most one scheduled movement update per
+  60 ms, with immediate final positions and activity changes.
+- A completed drag saves one position change and creates one undo step. Movement
+  previews use temporary awareness state. Cancelling a drag or closing its tab
+  before releasing it leaves the saved position unchanged.
+- Undo and redo affect this tab's changes. Viewers can select objects and publish
+  cursors, but cannot change content, geometry, or layer order.
+
+The [whiteboard model](examples/collaboration/whiteboard/model.js) uses nested
+Y.Maps under `whiteboard:objects:v1`. Position and size are separate atomic values,
+so moving an object does not overwrite a teammate's text or color edits.
+Simultaneous edits to the same property resolve to one value through Y.Map's
+conflict rules. Text does not merge at the character level. Deleting an object
+wins over a concurrent edit to that object. The UI bounds objects to the canvas.
+
+Offline edits remain in the open tab until reconnecting. Wait for **Saved** before
+closing it. The production build includes `/whiteboard.html` and uses the same
+room permissions, PostgreSQL persistence, and recovery flow as the other examples.
+
+`npm test` includes whiteboard concurrency and undo checks. Run its browser
+checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- whiteboard.spec.js
+```
+
+## Try the rich-text example
+
+Open [127.0.0.1:5173/rich-text.html](http://127.0.0.1:5173/rich-text.html) with the
+same development servers running. Sign in and create a room, or open an existing
+one. The plain-text editor remains available as its own example.
+
+- Write paragraphs, three levels of headings, bullet and numbered lists, and quotes.
+- Apply bold, italic, underline, and links to selected text. The link dialog accepts
+  HTTP and HTTPS URLs and can update or remove an existing link.
+- See collaborators' carets and selected text in their participant colors. Undo
+  and redo affect edits made in this tab, leaving other participants' edits intact.
+- Viewers can read and select text. Editing, formatting, and history commands are
+  disabled for viewers and when access is revoked.
+- Edits made while disconnected remain in the open tab and merge when it reconnects.
+  Wait for **Saved** before closing the tab. Saved formatting and content recover
+  after everyone leaves or the server restarts.
+
+The [rich-text editor](examples/collaboration/rich-text/editor.js) uses Tiptap with
+its [Yjs collaboration extension](https://tiptap.dev/docs/editor/extensions/functionality/collaboration).
+It binds to the `rich-text:content:v1` Y.XmlFragment in the SDK's document and uses
+Synixir for synchronization and persistence. It does not require a separate
+collaboration service. Tiptap's ordinary history is disabled in favor of Yjs undo.
+A small awareness adapter uses `richTextCursor` so plain-text and rich-text cursor
+positions never get mixed when both examples are open in the same room.
+
+This is a text document example, with no images, file uploads, comments, or version
+history. Each example has separate content within the room, while access and
+storage quotas apply to the whole room.
+
+Run its browser checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- rich-text.spec.js
+```
+
+## Try the multiplayer form example
+
+Open [127.0.0.1:5173/multiplayer-form.html](http://127.0.0.1:5173/multiplayer-form.html)
+with the same development servers running. Create a room or open an existing one,
+then open the form in another tab to collaborate on a project brief.
+
+- Edit the project name, goal, and audience together. Text changes merge at the
+  character level, including changes made to the same field while disconnected.
+- Choose a team, priority, target date, and launch channels. Separate fields and
+  separate checkboxes merge independently. Concurrent changes to the same choice
+  resolve to one value through Y.Map's conflict rules.
+- See who is editing or viewing each field, with participant-colored outlines
+  and shared text carets. These indicators do not lock fields. Presence clears
+  when focus leaves the form, the window loses focus, or the peer disconnects.
+- Track completion of the four required fields. Validation shows missing values
+  and text length limits without discarding the shared draft.
+- **Review brief** opens a live preview once required fields are complete. The
+  preview updates when teammates edit. This example does not submit the form to
+  an external service or record a finalized submission.
+- Undo and redo affect this tab's edits across text and choice fields. Viewers
+  can read, select text, and review the draft; they cannot edit or undo it.
+
+The [form model](examples/collaboration/multiplayer-form/model.js) stores text in
+separate top-level Y.Text fields named `multiplayer-form:<field>:v1`, with choices
+in `multiplayer-form:properties:v1`. The text controls reuse the existing
+CodeMirror/Yjs binding for shared selections, composition input, and undo.
+The `multiplayerForm` awareness field identifies the active form field. All data
+is separate from the other examples, with the same room permissions and storage.
+
+Offline changes remain in the open tab until reconnecting. Wait for **Saved**
+before closing it. Saved fields recover after all tabs close or the server restarts.
+
+`npm test` includes form merge and validation checks. Run the browser checks
+separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.js
+```
+
+## Try the flowchart builder
+
+Open [127.0.0.1:5173/flowchart.html](http://127.0.0.1:5173/flowchart.html) with the
+same development servers running. Create a room or use an existing one, then open
+another tab to build a workflow together.
+
+- Add process, decision, and start/end nodes. Drag nodes, move them with arrow
+  keys, and edit their labels, colors, and sizes. Zoom and scroll to explore.
+- Select a source node and choose a destination in **Connect to**, or use
+  **Pick on canvas** and click another node. Label branches such as Yes and No.
+- Select an arrow or its entry in **Connections** to edit its label or delete it.
+  Deleting a node removes its attached arrows. One undo restores both.
+- Live cursors, collaborator selections, and drag previews show where teammates
+  are working. Arrows follow the displayed node positions during dragging.
+  Cursor labels use participant colors with white text, matching the whiteboard.
+- Undo and redo affect this tab's changes. Viewers can explore and select nodes
+  and connections, while edits and history controls require editing permission.
+
+The [flowchart model](examples/collaboration/flowchart/model.js) stores nested
+Y.Maps under `flowchart:nodes:v1` and `flowchart:edges:v1`. Fields merge independently;
+concurrent edits to the same field resolve to one value using Y.Map's conflict
+rules. Connections use a key derived from their source and target so concurrent
+creation of the same arrow converges to one connection. Self-connections are
+excluded; reverse connections and multiple outgoing branches are supported.
+Arrows with deleted endpoints stay hidden, including ones created offline during
+a deletion. Undo can restore their endpoints.
+
+The `flowchart` awareness field carries temporary cursor, selection, and drag
+positions. The canvas reuses the whiteboard's motion helper and commits one
+position change per completed drag. Other examples keep separate data and cursor
+fields within the same room. This is a diagram editor; it does not execute workflows
+or automatically route arrows around intervening nodes.
+
+Offline changes remain in the open tab until reconnecting. Wait for **Saved**
+before closing it. Saved nodes and arrows recover after a server restart.
+
+`npm test` includes connection merge, deletion, and undo checks. Run the browser
+checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- flowchart.spec.js
+```
+
+## Try the collaborative table
+
+Open [127.0.0.1:5173/table.html](http://127.0.0.1:5173/table.html) with the same
+development servers running. Create a room or use an existing one, then open
+another tab to work on the same table.
+
+- New tables show three empty rows and Task, Owner, Status, and Due date columns.
+  These are all text cells, so you can rename columns for a different use case.
+- Click a cell to select it. Press Enter, double-click, or choose **Edit cell** to
+  edit. Typing on a selected cell replaces its contents. Arrow keys move between
+  selected cells; within an editor they move the caret. Tab moves to the next
+  cell, Enter moves down, and Escape returns to cell selection.
+- Collaborator-colored outlines show active cells with editing/viewing labels.
+  When two people edit the same cell, they also see each other's text carets and
+  selections. Text edits merge at the character level, including offline edits.
+- Add rows and columns, rename a selected column, clear cells, or delete rows
+  and columns. Undo restores deleted content and affects this tab's changes.
+- Paste plain tab-separated text into a selected cell to fill a rectangle. The
+  table adds rows and columns as needed, and one undo reverses the entire paste.
+  Multi-cell paste also works while editing a cell. Paste uses literal text;
+  quoted CSV parsing and spreadsheet formulas are not included.
+- Viewers can select and copy cells, but cannot change data, paste, or use undo.
+  On mobile, the table scrolls horizontally while the row numbers stay visible.
+
+The [table model](examples/collaboration/table/model.js) uses separate Y.Maps for
+row order, column order, column names, and deletion markers. Default row and column
+IDs are stable and require no initialization writes. Each cell uses a top-level
+Y.Text named `collaborative-table:cell:[row-id,column-id]:v1`, with the IDs encoded
+as a JSON array. Two users can edit an untouched cell without competing to create
+its shared text. Concurrent rows and columns sort by order, then by stable ID.
+Column names use Y.Map conflict resolution, while deletion markers hide rows and
+columns independently of concurrent renames or text edits.
+
+Deleted cells remain in the document so undo can restore them. The UI allows
+adding up to 100 rows and 12 columns, and pasting at most 50,000 characters at a
+time. These are example interaction limits, not server-enforced quotas;
+concurrent additions can exceed them. Only the active cell mounts a CodeMirror
+editor. Other cells keep stable DOM elements and display shared text updates.
+The `collaborativeTable` awareness field carries the selected row and column;
+text caret positions use the existing CodeMirror/Yjs awareness binding.
+
+Data is separate from the other examples in the same room. Offline edits remain
+in the open tab until reconnecting. Wait for **Saved** before closing it. Saved
+cells and table structure recover after a server restart.
+
+`npm test` includes table concurrency, deletion, and paste/undo checks. Run the
+browser checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- table.spec.js
+```
+
+## Editor presence and connection states
 
 Each account has a stable username; each editor visit gets a cursor color. The participant list
 counts connected editor visits, including multiple tabs for one account. Names
@@ -568,7 +830,7 @@ only that room's data. PostgreSQL is required. Test partitions append
 `MIX_TEST_PARTITION` to the test database name.
 
 Install JavaScript dependencies from the root workspace lockfile, then check the
-SDK and both browser examples:
+SDK and browser examples:
 
 ```sh
 npm ci

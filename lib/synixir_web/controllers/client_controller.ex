@@ -3,6 +3,12 @@ defmodule SynixirWeb.ClientController do
 
   def index(conn, _), do: page(conn, "index.html")
   def settings(conn, _), do: page(conn, "sdk.html")
+  def kanban(conn, _), do: page(conn, "kanban.html")
+  def whiteboard(conn, _), do: page(conn, "whiteboard.html")
+  def rich_text(conn, _), do: page(conn, "rich-text.html")
+  def multiplayer_form(conn, _), do: page(conn, "multiplayer-form.html")
+  def flowchart(conn, _), do: page(conn, "flowchart.html")
+  def table(conn, _), do: page(conn, "table.html")
 
   defp page(conn, name) do
     path = Application.app_dir(:synixir, "priv/static/" <> name)

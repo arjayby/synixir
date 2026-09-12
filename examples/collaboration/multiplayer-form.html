@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Synixir · Shared document</title>
+    <title>Synixir · Multiplayer form</title>
     <link rel="icon" href="data:," />
   </head>
-  <body>
+  <body class="multiplayer-form-page">
     <main>
       <header class="masthead">
-        <a class="brand" href="/" aria-label="Synixir home"><span aria-hidden="true">s/</span> Synixir</a>
-        <nav class="example-links" aria-label="Examples"><a id="other-example" class="demo-label" href="/kanban.html">Try the Kanban board</a><a data-example-link class="demo-label" href="/whiteboard.html">Try the whiteboard</a><a data-example-link class="demo-label" href="/rich-text.html">Try rich text</a><a data-example-link class="demo-label" href="/multiplayer-form.html">Try the multiplayer form</a><a data-example-link class="demo-label" href="/flowchart.html">Try the flowchart builder</a><a data-example-link class="demo-label" href="/table.html">Try the collaborative table</a></nav>
+        <a class="brand" href="/multiplayer-form.html" aria-label="Synixir home"><span aria-hidden="true">s/</span> Synixir</a>
+        <nav class="example-links" aria-label="Examples"><a data-example-link class="demo-label" href="/">Try the text editor</a><a id="other-example" class="demo-label" href="/kanban.html">Try the Kanban board</a><a data-example-link class="demo-label" href="/whiteboard.html">Try the whiteboard</a><a data-example-link class="demo-label" href="/rich-text.html">Try rich text</a><a data-example-link class="demo-label" href="/flowchart.html">Try the flowchart builder</a><a data-example-link class="demo-label" href="/table.html">Try the collaborative table</a></nav>
       </header>
 
       <section id="auth-panel" class="account-panel" aria-labelledby="sign-in-title" hidden>
-        <h1 id="sign-in-title">Your writing, shared with your team</h1>
+        <h1 id="sign-in-title">A better brief starts together</h1>
         <p>Sign in or create an account. Usernames are public account handles.</p>
         <form id="auth-form">
           <label for="account-username">Username</label>
@@ -28,15 +28,15 @@
       <p id="account-error" role="alert"></p>
       <div id="account-bar" class="account-bar" hidden><span>Signed in as <strong id="account-name"></strong></span><button id="sign-out" class="subtle">Sign out</button></div>
       <section id="rooms-panel" class="account-panel" hidden>
-        <h1>Your rooms</h1><ul id="room-list"></ul>
+        <h1>Your briefs</h1><ul id="room-list"></ul>
         <form id="create-room-form"><label for="new-room">New room ID</label><input id="new-room" name="room_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" required /><button>Create room</button></form>
       </section>
       <div id="collaboration" hidden>
       <div class="workspace-heading">
         <div>
-          <p class="eyebrow">A place to write together</p>
-          <h1>Shared document</h1>
-          <p class="intro">Write with the people who have access to this room.</p>
+          <p class="eyebrow">PLAN IT TOGETHER</p>
+          <h1>Multiplayer form</h1>
+          <p class="intro">Fill out a project brief together. See who’s working on each field.</p>
         </div>
         <div class="connection-controls">
           <span id="status" role="status" data-state="connecting">Connecting</span>
@@ -45,7 +45,7 @@
       </div>
 
       <div class="workspace">
-        <section class="document-panel" aria-label="Document editor">
+        <section class="document-panel" aria-label="Shared project brief">
           <div class="editor-toolbar">
             <span class="document-title" id="document-title">demo</span>
             <div class="history-controls" role="group" aria-label="Edit history">
@@ -56,7 +56,7 @@
           <div id="editor"></div>
           <div class="editor-footer">
             <span id="save-status" aria-live="polite">Not saved</span>
-            <span>Plain text</span>
+            <span>Shared draft · No submission required</span>
           </div>
         </section>
 
@@ -68,7 +68,7 @@
               <input id="room" name="room" value="demo" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" required />
               <button type="submit">Open room</button>
             </form>
-            <p class="note">An owner must grant access before someone can open this room. <a href="/">All rooms</a></p>
+            <p class="note">An owner must grant access before someone can open this room. <a data-room-home href="/multiplayer-form.html">All briefs</a></p>
           </section>
           <section class="people-panel" aria-labelledby="people-heading">
             <div class="section-heading">
@@ -83,7 +83,8 @@
               <label for="member-role">Role</label><select id="member-role" name="role"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select><button>Grant access</button></form>
             <p id="member-error" role="alert"></p>
           </section>
-          <p id="editor-help" class="note">Type anywhere, select text, or paste a paragraph. Undo affects your own edits.</p>
+          <p id="editor-help" class="note">Work on any field together. Undo affects your own changes. Required fields are marked with an asterisk.</p>
+        <p class="note"><a id="open-peer" target="_blank" rel="noopener">Open this form in another tab</a> to try collaboration.</p>
         </aside>
       </div>
 
@@ -93,6 +94,6 @@
       </footer>
       </div>
     </main>
-    <script type="module" src="/main.js"></script>
+    <script type="module" src="/multiplayer-form.js"></script>
   </body>
 </html>

@@ -15,6 +15,11 @@
     "@codemirror/state": "6.7.4",
     "@codemirror/view": "6.43.11",
     "@synixir/client": "0.1.0",
+    "@tiptap/core": "3.31.3",
+    "@tiptap/extension-collaboration": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
+    "@tiptap/y-tiptap": "3.0.9",
     "y-codemirror.next": "0.3.6",
     "yjs": "13.6.32"
   },

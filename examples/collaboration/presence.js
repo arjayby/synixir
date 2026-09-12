@@ -1,6 +1,6 @@
 const colors = ["#3565b0", "#9a4626", "#7a4daa", "#26735b", "#aa3864", "#74601b"];
 
-export function showParticipants(room, username) {
+export function showParticipants(room, username, { avatars = false } = {}) {
   const awareness = room.awareness;
   const list = document.querySelector("#participants");
   const count = document.querySelector("#participant-count");
@@ -9,11 +9,17 @@ export function showParticipants(room, username) {
   awareness.setLocalStateField("user", { name, color, colorLight: `${color}26` });
   document.querySelector("#your-name").textContent = name;
 
+  let previousRoster;
   function render() {
     const online = room.state.connection === "connected";
     const participants = [...awareness.getStates()]
       .filter(([id, state]) => state.user && (online || id === awareness.clientID))
       .sort(([a], [b]) => a === awareness.clientID ? -1 : b === awareness.clientID ? 1 : a - b);
+    // Awareness also changes for every cursor packet. Rebuild the roster only
+    // when the people or their displayed details change.
+    const roster = JSON.stringify([online, participants.map(([id, state]) => [id, state.user.name, state.user.color])]);
+    if (roster === previousRoster) return;
+    previousRoster = roster;
     list.replaceChildren(...participants.map(([id, state]) => {
       const local = id === awareness.clientID;
       const item = document.createElement("li");
@@ -24,6 +30,10 @@ export function showParticipants(room, username) {
       const label = document.createElement("span");
       label.className = "participant-name";
       label.textContent = typeof state.user.name === "string" ? state.user.name.slice(0, 32) : "Guest";
+      if (avatars) {
+        dot.classList.add("participant-avatar");
+        dot.textContent = label.textContent.slice(0, 2).toUpperCase();
+      }
       const detail = document.createElement("span");
       detail.className = "participant-detail";
       detail.textContent = local ? online ? "You" : "You · offline" : "Online";
