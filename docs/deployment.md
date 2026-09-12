@@ -6,15 +6,18 @@ HTTPS gateway and private Prometheus collector. It runs one application node.
 
 ## Start staging
 
-Requirements: Docker with Compose v2, Python 3.11 or newer, OpenSSL, and Node.js
-matching `examples/collaboration/.nvmrc` for the browser pilot. Docker builds Elixir,
-Erlang and the frontend inside the image. Run these commands from the repository:
+Requirements: Docker with Compose v2, OpenSSL, and Elixir 1.18+ with Erlang/OTP 27+.
+Use the versions pinned in `.tool-versions`. The standalone staging scripts use
+only the Elixir and Erlang standard libraries, so they need no `mix deps.get`.
+The browser pilot also needs Node.js matching `examples/collaboration/.nvmrc`.
+Docker builds the application and frontend inside the image. Run these commands
+from the repository:
 
 ```sh
-python3 scripts/staging.py init
-python3 scripts/staging.py build
-python3 scripts/staging.py up
-python3 scripts/staging.py status
+elixir scripts/staging.exs init
+elixir scripts/staging.exs build
+elixir scripts/staging.exs up
+elixir scripts/staging.exs status
 ```
 
 Open [local staging](https://localhost:8443) and create an account. The SDK settings
@@ -41,7 +44,7 @@ uses the `synixir-staging_database` volume. It does not use the development data
 or ports 4000, 5173 or 5432. To select another port or image at initialization:
 
 ```sh
-python3 scripts/staging.py init --port 8445 --image synixir:staging-v1
+elixir scripts/staging.exs init --port 8445 --image synixir:staging-v1
 ```
 
 Use `--directory /absolute/private/path` before the subcommand to select a saved
@@ -102,7 +105,7 @@ Install the browser pilot dependencies once:
 ```sh
 npm ci
 npx playwright install --only-shell chromium
-python3 scripts/staging.py pilot
+elixir scripts/staging.exs pilot
 ```
 
 The pilot creates owner, editor and viewer accounts. It checks shared editing,
@@ -118,8 +121,8 @@ The private `pilot.json` retains fixture credentials and browser sessions.
 pilot after an upgrade:
 
 ```sh
-python3 scripts/staging.py check-pilot
-python3 scripts/staging.py native-check
+elixir scripts/staging.exs check-pilot
+elixir scripts/staging.exs native-check
 ```
 
 The pilot's document and memberships are fixtures. Editing them changes the
@@ -127,7 +130,7 @@ expected results. To run the entire rehearsal again without touching this
 installation, CI and local development use a fresh, randomly named project:
 
 ```sh
-python3 scripts/staging.py rehearse --image synixir:staging \
+elixir scripts/staging.exs rehearse --image synixir:staging \
   --output /tmp/synixir-release-pilot.json
 ```
 
@@ -138,8 +141,8 @@ for each run. It never deletes the persistent staging volume.
 ## Backups and replacement
 
 ```sh
-python3 scripts/staging.py backup
-python3 scripts/staging.py verify /absolute/path/to/backup.dump
+elixir scripts/staging.exs backup
+elixir scripts/staging.exs verify /absolute/path/to/backup.dump
 ```
 
 Backups are full PostgreSQL custom archives with a SHA-256 sidecar. Verification
@@ -153,8 +156,8 @@ Build a distinct image tag for a candidate, then replace staging:
 
 ```sh
 docker build --build-arg REVISION="$(git rev-parse HEAD)" -t synixir:staging-v2 .
-python3 scripts/staging.py upgrade --image synixir:staging-v2
-python3 scripts/staging.py check-pilot
+elixir scripts/staging.exs upgrade --image synixir:staging-v2
+elixir scripts/staging.exs check-pilot
 ```
 
 For an uncommitted build, append `-dirty` to its revision label, as the `build`
@@ -185,8 +188,8 @@ arbitrary future migration compatibility.
 ## Stop and scope
 
 ```sh
-python3 scripts/staging.py stop
-python3 scripts/staging.py up
+elixir scripts/staging.exs stop
+elixir scripts/staging.exs up
 ```
 
 Stopping retains the database volume, credentials and backups. Do not remove the

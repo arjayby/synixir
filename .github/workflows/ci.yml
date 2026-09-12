@@ -18,6 +18,12 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set up Erlang and Elixir for staging scripts
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
       - name: Set up Node.js for the packaged browser pilot
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -32,7 +38,7 @@ jobs:
         run: docker build --build-arg REVISION="$GITHUB_SHA" -t synixir:ci .
 
       - name: Rehearse HTTPS, native libraries, replacement and database recovery
-        run: python3 scripts/staging.py rehearse --image synixir:ci --output /tmp/synixir-release-pilot.json
+        run: elixir scripts/staging.exs rehearse --image synixir:ci --output /tmp/synixir-release-pilot.json
 
   test:
     name: Format, compile, and test
@@ -78,6 +84,9 @@ jobs:
       - name: Run tests
         run: mix test
 
+      - name: Test standalone operations scripts
+        run: elixir scripts/operations_test.exs
+
       - name: Set up Node.js for the browser example
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -104,10 +113,10 @@ jobs:
         run: npm test
 
       - name: Verify backup restoration and concurrent limits in isolated databases
-        run: python3 scripts/operations/database.py --docker-container '${{ job.services.postgres.id }}' drill --output /tmp/synixir-restore.json
+        run: elixir scripts/operations/database.exs --docker-container '${{ job.services.postgres.id }}' drill --output /tmp/synixir-restore.json
 
       - name: Exercise SDK load, reconnects, large transfers and persisted replay
-        run: python3 scripts/operations/database.py --docker-container '${{ job.services.postgres.id }}' load --output /tmp/synixir-load.json
+        run: elixir scripts/operations/database.exs --docker-container '${{ job.services.postgres.id }}' load --output /tmp/synixir-load.json
 
       - name: Validate Prometheus configuration, alert behavior and actual metrics
         env:

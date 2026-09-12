@@ -35,13 +35,15 @@ require separate setup.
 
 ## Try local Docker staging
 
-Start Docker or OrbStack. With Docker Compose v2, Python 3.11 or newer, and
-OpenSSL installed, run these commands from the repository for the first setup:
+Start Docker or OrbStack. Install Docker Compose v2, OpenSSL, and the Elixir and
+Erlang versions in `.tool-versions`. The standalone scripts require Elixir 1.18+
+and Erlang/OTP 27+ with no Mix dependencies. Run these commands from the repository
+for the first setup:
 
 ```sh
-python3 scripts/staging.py init
-python3 scripts/staging.py build
-python3 scripts/staging.py up
+elixir scripts/staging.exs init
+elixir scripts/staging.exs build
+elixir scripts/staging.exs up
 ```
 
 Open [https://localhost:8443](https://localhost:8443), accept the local self-signed
@@ -49,8 +51,8 @@ certificate, and create an account and room. The release includes all browser
 examples and uses its own PostgreSQL volume and private Prometheus collector.
 Docker builds Elixir, Erlang, and the frontend inside the image.
 
-For an existing installation, run `python3 scripts/staging.py up` to start it.
-Use `python3 scripts/staging.py stop` to stop it while retaining the database.
+For an existing installation, run `elixir scripts/staging.exs up` to start it.
+Use `elixir scripts/staging.exs stop` to stop it while retaining the database.
 Initialization runs only once; keep the private `.local/staging` configuration
 with its database volume. The [staging runbook](docs/deployment.md) covers the
 browser pilot, certificate renewal, backups, and upgrades.

@@ -1,4 +1,4 @@
-// Invoked by database.py, which owns the isolated database and server lifecycle.
+// Invoked by database.exs, which owns the isolated database and server lifecycle.
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";

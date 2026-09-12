@@ -1,4 +1,4 @@
-name: ${SYNIXIR_STAGE_PROJECT:?Initialize staging with scripts/staging.py init}
+name: ${SYNIXIR_STAGE_PROJECT:?Initialize staging with scripts/staging.exs init}
 
 x-release: &release
   image: ${SYNIXIR_IMAGE:?Set the locally built release image}
