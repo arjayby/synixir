@@ -39,6 +39,9 @@ preserved in development and production. Navigation uses full page loads to
 retain the unsaved-edit warning and tear down old room connections.
 
 Browser tests run on ports 5174 and 4010 with a separate Phoenix test database.
+When testing separate Git worktrees in parallel, set `SYNIXIR_TEST_FRONTEND_PORT`
+and `SYNIXIR_TEST_BACKEND_PORT` to a unique pair for each run. The test server's
+origin allowlist follows the selected frontend port.
 They enable a development-only inspection adapter for public SDK and editor
 APIs; production builds exclude it. The package consumer check also uses Vite
 to verify that the published SDK works outside Next.js.
