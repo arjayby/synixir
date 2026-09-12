@@ -317,7 +317,9 @@ defmodule Synixir.Script.Stage do
       S.run(
         [
           "node",
-          "scripts/staging-pilot.js",
+          "--import",
+          "tsx",
+          "scripts/staging-pilot.ts",
           "verify",
           stage.url,
           Path.join(stage.directory, "pilot.json")
@@ -335,7 +337,9 @@ defmodule Synixir.Script.Stage do
     S.private_json(manifest, %{})
 
     try do
-      S.run(["node", "scripts/staging-pilot.js", "seed", stage.url, manifest], capture: false)
+      S.run(["node", "--import", "tsx", "scripts/staging-pilot.ts", "seed", stage.url, manifest],
+        capture: false
+      )
     rescue
       error ->
         if S.json(manifest) == %{}, do: File.rm!(manifest)

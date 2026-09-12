@@ -39,7 +39,7 @@ Build the existing npm workspace with its lockfile and copy the Vite `dist` outp
 
 At the baseline, copying files alone is insufficient. `SynixirWeb.static_paths/0` excludes `index.html` and `sdk.html`, and the router has no root page route. `Plug.Static` does not automatically serve a directory index. Add deliberate routes for `/` and the SDK page, and serve their HTML with revalidation or `no-store`. Hashed Vite assets can use long immutable caching. Keep API and socket paths outside any HTML fallback. Sources: [web configuration](../../lib/synixir_web.ex), [router](../../lib/synixir_web/router.ex), [Plug.Static implementation](../../deps/plug/lib/plug/static.ex).
 
-One origin preserves the SDK's default session/CSRF flow and avoids adding credentialed CORS. The default access callback uses `credentials: "same-origin"`; simply hosting the frontend on another origin changes its authentication behavior. Source: [SDK access implementation](../../packages/client/src/access.js). Serving files from nginx is possible, but packaging HTML and the API together makes image rollback and asset matching simpler for this milestone.
+One origin preserves the SDK's default session/CSRF flow and avoids adding credentialed CORS. The default access callback uses `credentials: "same-origin"`; simply hosting the frontend on another origin changes its authentication behavior. Source: [SDK access implementation](../../packages/client/src/access.ts). Serving files from nginx is possible, but packaging HTML and the API together makes image rollback and asset matching simpler for this milestone.
 
 ## Make nginx the only trusted ingress
 

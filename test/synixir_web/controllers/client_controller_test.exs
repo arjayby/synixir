@@ -21,7 +21,7 @@ defmodule SynixirWeb.ClientControllerTest do
         assert html_response(conn, 200) == File.read!(path)
       else
         assert response(conn, 404) ==
-                 "Client assets are not built. Use the Vite development server."
+                 "Client assets are not built. Use the Next.js development server."
       end
     end
   end

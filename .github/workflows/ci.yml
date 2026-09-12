@@ -92,11 +92,14 @@ jobs:
         with:
           node-version-file: examples/collaboration/.nvmrc
 
-      - name: Install JavaScript workspace dependencies
+      - name: Install TypeScript workspace dependencies
         run: npm ci
 
       - name: Test the client SDK
         run: npm test
+
+      - name: Typecheck the SDK, examples, tests, and tools
+        run: npm run typecheck
 
       - name: Verify the packed client SDK
         run: npm run test:package
