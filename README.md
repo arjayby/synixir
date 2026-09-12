@@ -9,8 +9,9 @@ shared cards, drag-and-drop, and card activity. A whiteboard adds sticky notes,
 shapes, live cursors, and selections. A rich-text example adds formatted documents
 with shared selections and character-level editing. A multiplayer form adds shared
 project briefs with field presence and live previews. A flowchart builder adds
-connected nodes, labeled branches, and live drag previews. All examples recover
-saved state after a server crash.
+connected nodes, labeled branches, and live drag previews. A collaborative table
+adds shared cells, rows, columns, and spreadsheet paste. All examples recover saved
+state after a server crash.
 
 This implementation runs on one Phoenix node. Accounts, expiring sessions, and
 owner/editor/viewer room permissions are implemented. The browser SDK lives in
@@ -345,6 +346,58 @@ checks separately from `mix test` with:
 
 ```sh
 npm test --workspace synixir-collaboration-example -- flowchart.spec.js
+```
+
+## Try the collaborative table
+
+Open [127.0.0.1:5173/table.html](http://127.0.0.1:5173/table.html) with the same
+development servers running. Create a room or use an existing one, then open
+another tab to work on the same table.
+
+- New tables show three empty rows and Task, Owner, Status, and Due date columns.
+  These are all text cells, so you can rename columns for a different use case.
+- Click a cell to select it. Press Enter, double-click, or choose **Edit cell** to
+  edit. Typing on a selected cell replaces its contents. Arrow keys move between
+  selected cells; within an editor they move the caret. Tab moves to the next
+  cell, Enter moves down, and Escape returns to cell selection.
+- Collaborator-colored outlines show active cells with editing/viewing labels.
+  When two people edit the same cell, they also see each other's text carets and
+  selections. Text edits merge at the character level, including offline edits.
+- Add rows and columns, rename a selected column, clear cells, or delete rows
+  and columns. Undo restores deleted content and affects this tab's changes.
+- Paste plain tab-separated text into a selected cell to fill a rectangle. The
+  table adds rows and columns as needed, and one undo reverses the entire paste.
+  Multi-cell paste also works while editing a cell. Paste uses literal text;
+  quoted CSV parsing and spreadsheet formulas are not included.
+- Viewers can select and copy cells, but cannot change data, paste, or use undo.
+  On mobile, the table scrolls horizontally while the row numbers stay visible.
+
+The [table model](examples/collaboration/table/model.js) uses separate Y.Maps for
+row order, column order, column names, and deletion markers. Default row and column
+IDs are stable and require no initialization writes. Each cell uses a top-level
+Y.Text named `collaborative-table:cell:[row-id,column-id]:v1`, with the IDs encoded
+as a JSON array. Two users can edit an untouched cell without competing to create
+its shared text. Concurrent rows and columns sort by order, then by stable ID.
+Column names use Y.Map conflict resolution, while deletion markers hide rows and
+columns independently of concurrent renames or text edits.
+
+Deleted cells remain in the document so undo can restore them. The UI allows
+adding up to 100 rows and 12 columns, and pasting at most 50,000 characters at a
+time. These are example interaction limits, not server-enforced quotas;
+concurrent additions can exceed them. Only the active cell mounts a CodeMirror
+editor. Other cells keep stable DOM elements and display shared text updates.
+The `collaborativeTable` awareness field carries the selected row and column;
+text caret positions use the existing CodeMirror/Yjs awareness binding.
+
+Data is separate from the other examples in the same room. Offline edits remain
+in the open tab until reconnecting. Wait for **Saved** before closing it. Saved
+cells and table structure recover after a server restart.
+
+`npm test` includes table concurrency, deletion, and paste/undo checks. Run the
+browser checks separately from `mix test` with:
+
+```sh
+npm test --workspace synixir-collaboration-example -- table.spec.js
 ```
 
 ## Editor presence and connection states
