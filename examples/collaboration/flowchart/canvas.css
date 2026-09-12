@@ -1,33 +1,43 @@
-.flowchart-page .flow-node { background: transparent; border: 0; overflow: visible; font-size: 17px; padding: 16px; }
-.flowchart-page .flow-node::before { content: ""; position: absolute; inset: 0; background: inherit; border: 1.5px solid #819b8d; border-radius: 10px; z-index: -1; box-shadow: 0 3px 8px #28332c12; }
-.flowchart-page .flow-node { isolation: isolate; background: none !important; }
-.flowchart-page .flow-node.color-blue::before { background: #d6e7ff; }
-.flowchart-page .flow-node.color-yellow::before { background: #fff0a4; }
-.flowchart-page .flow-node.color-mint::before { background: #d5eedd; }
-.flowchart-page .flow-node.color-rose::before { background: #f9dbe3; }
-.flowchart-page .flow-node.color-white::before { background: #fff; }
-.flowchart-page .object-terminal::before { border-radius: 999px; }
-.flowchart-page .object-decision::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border-radius: 0; }
-.flowchart-page .object-decision { padding: 30px 45px; }
-.flow-node > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-.flowchart-page .object-layer { pointer-events: none; z-index: 1; }
-.flowchart-page .flow-node { pointer-events: auto; }
-.edge-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.flow-edge { fill: none; stroke: #648172; stroke-width: 2; }
-.flow-edge-hit { fill: none; stroke: transparent; stroke-width: 18; cursor: pointer; }
-.edge-layer .is-selected .flow-edge { stroke: #216640; stroke-width: 3; }
-.flow-edge-label { font: 13px system-ui, sans-serif; fill: #375745; text-anchor: middle; paint-order: stroke; stroke: #fafcfb; stroke-width: 6; stroke-linejoin: round; cursor: pointer; }
-.flowchart-page .is-connecting .flow-node { cursor: crosshair; }
-.flowchart-page .is-connecting .flow-node:hover { outline: 3px dashed #285c43; outline-offset: 4px; }
-.connect-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; border-top: 1px solid #d6e0d9; margin-top: 16px; padding-top: 16px; }
-.connect-fields > div { flex: 1 1 170px; min-width: 0; }
-.connect-fields input, .connect-fields select { width: 100%; }
-#edge-label { max-width: 450px; }
-.flow-connections { padding: 18px; border-top: 1px solid #d6e0d9; }
+/* Shape rendering and the inspector are app UI; React Flow owns the canvas. */
+.flowchart-editor { color: var(--foreground); background: var(--card); min-width: 0; }
+.flowchart-editor #whiteboard-viewport { height: 520px; overflow: hidden; background: var(--background); }
+.flowchart-editor .react-flow { --xy-background-color: var(--background); --xy-node-color: var(--foreground); --xy-edge-stroke: var(--muted-foreground); --xy-edge-stroke-selected: var(--primary); --xy-controls-button-background-color: var(--card); --xy-controls-button-background-color-hover: var(--muted); --xy-controls-button-color: var(--foreground); --xy-controls-button-border-color: var(--border); --xy-minimap-background-color: var(--card); --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 65%, transparent); }
+.flowchart-editor .flow-node { padding: 0; background: transparent; border: 0; font-size: 17px; color: #223e33; }
+.flowchart-editor .flow-node.selected, .flowchart-editor .flow-node:focus-visible { outline: 2px solid var(--ring); outline-offset: 5px; }
+.flow-shape { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; border: 1.5px solid #819b8d; border-radius: 10px; background: var(--flow-node-fill); box-shadow: 0 3px 8px #28332c12; }
+.flowchart-editor .color-blue { --flow-node-fill: #d6e7ff; }
+.flowchart-editor .color-yellow { --flow-node-fill: #fff0a4; }
+.flowchart-editor .color-mint { --flow-node-fill: #d5eedd; }
+.flowchart-editor .color-rose { --flow-node-fill: #f9dbe3; }
+.flowchart-editor .color-white { --flow-node-fill: #fff; }
+.flow-shape-terminal { border-radius: 999px; }
+.flow-shape-decision { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border-radius: 0; padding: 30px 45px; }
+.flow-shape > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; text-align: center; line-height: 1.45; }
+.flowchart-editor .react-flow__handle { width: 10px; height: 10px; background: var(--primary); border: 2px solid var(--card); }
+.flowchart-editor .react-flow__resize-control.handle { width: 9px; height: 9px; border-radius: 2px; }
+.flowchart-editor .react-flow__controls-button { display: flex; justify-content: center; align-items: center; width: 30px; height: 30px; padding: 7px; border-radius: 0; color: var(--foreground); background: var(--card); }
+.flowchart-editor .react-flow__controls-button:hover { background: var(--muted); }
+.flowchart-editor .react-flow__controls-button svg { width: 16px; height: 16px; }
+.flowchart-editor .flow-edge { fill: none; stroke: var(--muted-foreground); stroke-width: 2; }
+.flowchart-editor .flow-edge.is-selected { stroke: var(--primary); stroke-width: 3; }
+.flowchart-editor .flow-edge-label { font: 13px system-ui, sans-serif; fill: var(--foreground); text-anchor: middle; paint-order: stroke; stroke: var(--background); stroke-width: 6; stroke-linejoin: round; cursor: pointer; }
+.flowchart-editor .is-connecting .flow-node { cursor: crosshair; }
+.flowchart-editor .is-connecting .flow-node:hover { outline: 3px dashed var(--ring); outline-offset: 4px; }
+.flow-presence { position: absolute; inset: 0; pointer-events: none; z-index: 1000; }
+.flowchart-editor .flow-empty { position: absolute; left: 0; top: 48px; max-width: 360px; pointer-events: none; }
+.flowchart-editor .flow-inspector { background: var(--card); }
+.flow-inspector .inspector-fields > div, .flow-inspector .connect-fields > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.flow-inspector .inspector-fields textarea { color: var(--foreground); background: var(--background); border-color: var(--input); }
+.flow-inspector .inspector-fields textarea:read-only { background: var(--muted); }
+.flow-inspector .connect-fields { display: flex; flex-direction: row; flex-wrap: wrap; align-items: end; gap: 12px; border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; }
+.flow-inspector .connect-fields > div { flex: 1 1 170px; }
+.flow-inspector .connect-fields input, .flow-inspector .connect-fields select { width: 100%; }
+.flow-inspector #edge-label { max-width: 450px; margin-top: 8px; }
+.flow-connections { padding: 18px; border-top: 1px solid var(--border); }
 .flow-connections h2 { margin: 0 0 8px; }
-.flow-connections p { color: #52695b; font-size: 14px; margin: 0; }
-#connection-list { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
-#connection-list li { max-width: 100%; }
-#connection-list button { text-align: left; overflow-wrap: anywhere; }
-#connection-list [aria-pressed="true"] { background: #deeee4; border-color: #285c43; }
-.flowchart-page #delete-connection { color: #9d3838; }
+.flow-connections p { color: var(--muted-foreground); font-size: 14px; margin: 0; }
+.flow-connections #connection-list { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.flow-connections #connection-list li { max-width: 100%; }
+.flow-connections #connection-list button { text-align: left; overflow-wrap: anywhere; white-space: normal; height: auto; min-height: 32px; }
+.flow-connections #connection-list [aria-pressed="true"] { background: var(--muted); border-color: var(--ring); }
+@media (max-width: 640px) { .flowchart-editor #whiteboard-viewport { height: 440px; } .flowchart-editor .react-flow__minimap { display: none; } }

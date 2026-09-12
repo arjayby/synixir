@@ -25,6 +25,7 @@
     "@tiptap/pm": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
     "@tiptap/y-tiptap": "3.0.9",
+    "@xyflow/react": "12.11.6",
     "class-variance-authority": "0.7.1",
     "cn": "0.3.0",
     "lucide-react": "1.45.0",

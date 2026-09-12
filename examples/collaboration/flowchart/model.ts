@@ -62,7 +62,25 @@ export function createFlowchartModel(doc: Y.Doc) {
       const position = item.get("position");
       const next = { width: clamp(size.width, 80, Math.min(600, canvasSize.width - position.x)),
         height: clamp(size.height, 60, Math.min(500, canvasSize.height - position.y)) };
-      action(() => item.set("size", next));
+      const previous = item.get("size");
+      if (previous.width !== next.width || previous.height !== next.height) action(() => item.set("size", next));
+    },
+    // Resizing from the top or left changes both bounds. Commit those fields
+    // together so one Undo restores the gesture without touching text or color.
+    reshape(id: string, size: Size, position?: Point) {
+      const item = objects.get(id);
+      if (!(item instanceof Y.Map) || !Number.isFinite(size.width) || !Number.isFinite(size.height)) return;
+      if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) return;
+      const nextSize = { width: clamp(size.width, 80, 600), height: clamp(size.height, 60, 500) };
+      const nextPosition = boundedPosition(position ?? item.get("position"), nextSize);
+      const oldSize = item.get("size"), oldPosition = item.get("position");
+      const changedSize = oldSize.width !== nextSize.width || oldSize.height !== nextSize.height;
+      const changedPosition = oldPosition.x !== nextPosition.x || oldPosition.y !== nextPosition.y;
+      if (!changedSize && !changedPosition) return;
+      action(() => {
+        if (changedSize) item.set("size", nextSize);
+        if (changedPosition) item.set("position", nextPosition);
+      });
     },
     edit(id: string, field: string, value: string) {
       const item = objects.get(id ?? "");

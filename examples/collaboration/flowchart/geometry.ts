@@ -1,13 +1,14 @@
 // Attach arrows to the side facing the other node. Control points keep the
 // arrow perpendicular to the boundary, including the tips of decision nodes.
-export function connectionPath(source: Pick<import("../lib/canvas-data.ts").CanvasItem, "position" | "size">, target: Pick<import("../lib/canvas-data.ts").CanvasItem, "position" | "size">, { reciprocal = false } = {}) {
+export function connectionPath(source: Pick<import("../lib/canvas-data.ts").CanvasItem, "position" | "size">, target: Pick<import("../lib/canvas-data.ts").CanvasItem, "position" | "size">, { reciprocal = false, targetGap = 0 } = {}) {
   const a = { x: source.position.x + source.size.width / 2, y: source.position.y + source.size.height / 2 };
   const b = { x: target.position.x + target.size.width / 2, y: target.position.y + target.size.height / 2 };
   const horizontal = Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
   const axis = horizontal ? 'x' : 'y';
   const sign = b[axis] >= a[axis] ? 1 : -1;
   a[axis] += sign * (horizontal ? source.size.width : source.size.height) / 2;
-  b[axis] -= sign * (horizontal ? target.size.width : target.size.height) / 2;
+  // Leave room for a visible arrowhead beside a connection handle.
+  b[axis] -= sign * ((horizontal ? target.size.width : target.size.height) / 2 + targetGap);
   const bend = Math.max(45, Math.abs(b[axis] - a[axis]) / 2);
   const c = { ...a, [axis]: a[axis] + sign * bend };
   const d = { ...b, [axis]: b[axis] - sign * bend };
