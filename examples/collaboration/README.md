@@ -21,6 +21,8 @@ room selection, and navigation. `components/workspace/workspace.tsx` owns each
 SDK connection and its subscriptions, permissions, presence, and teardown.
 The editor/canvas modules mount inside a React-owned host and release their
 listeners and bindings when that host unmounts. They load only when selected.
+The [whiteboard](whiteboard/README.md) embeds Excalidraw with a Yjs scene adapter
+and locally served fonts.
 `components/ui/` contains the generated shadcn primitives, and
 `app/globals.css` contains Tailwind, theme tokens, and shared layout styles.
 

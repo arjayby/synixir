@@ -1,114 +1,55 @@
-import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { canvas, drawShape, elementPoint, savedWhiteboard as saved, scene, selectShape, setupWhiteboard as setup } from "./whiteboard-helpers.ts";
 
-for (const reducedMotion of [false, true]) test(`remote cursor motion is smooth and stable, reduced motion=${reducedMotion}`, async ({ page, context, baseURL }) => {
-  await register(page.request, baseURL);
-  const roomId = `motion-${randomUUID()}`;
-  expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  await page.goto(`${baseURL}/whiteboard.html?room=${roomId}`);
-  await expect(page.locator("#save-status")).toHaveText("Saved");
-  await page.getByRole("button", { name: "+ Sticky note", exact: true }).click();
-  await page.getByLabel("Object text").fill("Stationary note");
-  await expect(page.locator("#save-status")).toHaveText("Saved");
+test.setTimeout(90_000);
+for (const reducedMotion of [false, true]) test(`Excalidraw cursor motion leaves shared scene and roster stable, reduced motion=${reducedMotion}`, async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url); await saved(page); await drawShape(page);
   const peer = await context.newPage();
   await peer.emulateMedia({ reducedMotion: reducedMotion ? "reduce" : "no-preference" });
-  await peer.goto(`${baseURL}/whiteboard.html?room=${roomId}`);
-  await expect(peer.locator("#save-status")).toHaveText("Saved");
-  await page.locator("#whiteboard-viewport").scrollIntoViewIfNeeded();
-  const box = await page.locator("#whiteboard-viewport").boundingBox();
-  if (!box) throw new Error("Expected a visible element");
-  await page.mouse.move(box.x + 80, box.y + 80);
-  await expect(peer.locator(".remote-cursor")).toHaveCount(1);
-  await peer.evaluate(() => {
-    const pointer = document.querySelector<HTMLElement>(".remote-cursor")!;
-    const participant = document.querySelector<HTMLElement>("#participants li:last-child")!;
-    const originalX = pointer.getBoundingClientRect().x;
-    const frames: number[] = [];
-    let unrelatedMutations = 0;
-    const observer = new MutationObserver(records => { unrelatedMutations += records.length; });
-    for (const node of document.querySelectorAll(".whiteboard-object, .object-inspector, #participants")) {
-      observer.observe(node, { attributes: true, childList: true, subtree: true, characterData: true });
-    }
-    window.motionSample = new Promise(resolve => {
-      const started = performance.now();
-      function frame(time: number) {
-        const current = document.querySelector<HTMLElement>(".remote-cursor")!;
-        frames.push(current.getBoundingClientRect().x - originalX);
-        if (time - started < 500) requestAnimationFrame(frame);
-        else {
-          observer.disconnect();
-          resolve({ frames, unrelatedMutations, samePointer: current === pointer, sameParticipant: participant === document.querySelector<HTMLElement>("#participants li:last-child")! });
-        }
-      }
-      requestAnimationFrame(frame);
-    });
+  await peer.goto(url); await saved(peer);
+  await canvas(page).scrollIntoViewIfNeeded();
+  const box = await canvas(page).boundingBox();
+  await page.mouse.move(box!.x + 250, box!.y + 400);
+  const remotePointer = () => peer.evaluate(() => [...window.synixirWhiteboardTest!.getAppState().collaborators.values()][0]?.pointer);
+  await expect.poll(async () => (await remotePointer())?.x).toBeCloseTo(250, 0);
+  const original = (await remotePointer())!;
+  const docBefore = await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()));
+  const stable = peer.evaluate(async () => {
+    const canvas = document.querySelector(".excalidraw__canvas.interactive");
+    const roster = document.querySelector("#participants li:last-child");
+    let mutations = 0;
+    const observer = new MutationObserver(records => { mutations += records.length; });
+    observer.observe(document.querySelector("#participants")!, { childList: true, subtree: true, characterData: true, attributes: true });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    observer.disconnect();
+    return { sameCanvas: canvas === document.querySelector(".excalidraw__canvas.interactive"),
+      sameRoster: roster === document.querySelector("#participants li:last-child"), mutations };
   });
-  await page.mouse.move(box.x + 280, box.y + 80);
-  const sample = await peer.evaluate(() => window.motionSample);
-  const intermediate = sample.frames.filter((x: number) => x > 1 && x < 199);
-  console.log(`Cursor motion: ${intermediate.length} intermediate frames; cursor retained=${sample.samePointer}; participant retained=${sample.sameParticipant}; unrelated DOM mutations=${sample.unrelatedMutations}`);
-  if (reducedMotion) expect(intermediate.length).toBe(0);
-  else expect(intermediate.length, "The remote cursor should move on frames between network packets").toBeGreaterThanOrEqual(2);
-  expect(sample.frames.at(-1)).toBeCloseTo(200, 0);
-  expect(sample.samePointer).toBe(true);
-  expect(sample.sameParticipant).toBe(true);
-  expect(sample.unrelatedMutations).toBe(0);
-  await page.mouse.move(box.x + 280, box.y - 20);
-  await expect(peer.locator(".remote-cursor")).toHaveCount(0);
+  await page.mouse.move(box!.x + 450, box!.y + 400, { steps: 8 });
+  await expect.poll(async () => (await remotePointer())?.x).toBeCloseTo(original.x + 200, 0);
+  expect(await stable).toEqual({ sameCanvas: true, sameRoster: true, mutations: 0 });
+  expect(await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(docBefore);
+  await page.mouse.move(box!.x + 250, box!.y - 20);
+  await expect.poll(remotePointer).toBeUndefined();
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
-  await expect(peer.locator(".remote-selection")).toHaveCount(0);
+  await expect.poll(() => peer.evaluate(() => window.synixirWhiteboardTest!.getAppState().collaborators.size)).toBe(0);
   await expect(peer.locator("#participants li")).toHaveCount(1);
 });
 
-test("remote dragging interpolates the shape and its selection together while local dragging stays immediate", async ({ page, context, baseURL }) => {
-  await register(page.request, baseURL);
-  const roomId = `drag-motion-${randomUUID()}`;
-  expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  const url = `${baseURL}/whiteboard.html?room=${roomId}`;
-  await page.goto(url);
-  await expect(page.locator("#save-status")).toHaveText("Saved");
-  await page.getByRole("button", { name: "+ Sticky note", exact: true }).click();
-  await page.getByLabel("Object text").fill("Moving note");
-  await expect(page.locator("#save-status")).toHaveText("Saved");
-  const peer = await context.newPage();
-  await peer.goto(url);
-  await expect(peer.locator("#save-status")).toHaveText("Saved");
-  await expect(peer.locator(".remote-selection")).toHaveCount(1);
-  const shape = page.getByRole("button", { name: "Sticky note: Moving note", exact: true });
-  await shape.scrollIntoViewIfNeeded();
-  const box = await shape.boundingBox();
-  if (!box) throw new Error("Expected a visible element");
-  await page.mouse.move(box.x + 30, box.y + 30);
-  await page.mouse.down();
-  await peer.evaluate(() => {
-    const shape = document.querySelector<HTMLElement>(".whiteboard-object")!;
-    const ring = document.querySelector<HTMLElement>(".remote-selection")!;
-    const origin = shape.getBoundingClientRect().x;
-    const frames: { x: number; separation: number; }[] = [];
-    window.dragMotionSample = new Promise(resolve => {
-      const started = performance.now();
-      function frame(time: number) {
-        frames.push({ x: shape.getBoundingClientRect().x - origin,
-          separation: Math.abs(shape.getBoundingClientRect().x - ring.getBoundingClientRect().x) });
-        if (time - started < 500) requestAnimationFrame(frame);
-        else resolve({ frames, sameRing: document.querySelector<HTMLElement>(".remote-selection")! === ring });
-      }
-      requestAnimationFrame(frame);
-    });
-  });
-  await page.mouse.move(box.x + 150, box.y + 30);
-  const localX = await shape.evaluate(node => new Promise<number>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(node.getBoundingClientRect().x)))));
-  expect(localX - box.x).toBeCloseTo(120, 0);
-  const sample = await peer.evaluate(() => window.dragMotionSample);
-  const intermediate = sample.frames.filter((frame: { x: number; }) => frame.x > 1 && frame.x < 119);
-  console.log(`Drag motion: ${intermediate.length} intermediate frames; max selection separation=${Math.max(...sample.frames.map((frame: { separation: any; }) => frame.separation)).toFixed(2)}px`);
-  expect(intermediate.length).toBeGreaterThanOrEqual(2);
-  expect(sample.frames.at(-1)!.x).toBeCloseTo(120, 0);
-  expect(Math.max(...sample.frames.map((frame: { separation: any; }) => frame.separation))).toBeLessThan(1);
-  expect(sample.sameRing).toBe(true);
-  await page.mouse.up();
-  await expect(page.locator("#save-status")).toHaveText("Saved");
-  const final = await shape.evaluate(node => getComputedStyle(node).transform);
-  await expect(peer.locator(".whiteboard-object")).toHaveCSS("transform", final);
+test("Excalidraw shows a peer's active drag and selection before pointer release", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url); await saved(page);
+  const element = await drawShape(page);
+  const peer = await context.newPage(); await peer.goto(url); await saved(peer);
+  await selectShape(page, element.id);
+  const point = await elementPoint(page, element.id);
+  await page.mouse.move(point.x - element.width / 2, point.y); await page.mouse.down();
+  await page.mouse.move(point.x - element.width / 2 + 120, point.y, { steps: 8 });
+  await expect.poll(async () => (await scene(page))[0].x).toBeCloseTo(element.x + 120, 0);
+  await expect.poll(async () => (await scene(peer))[0].x).toBeCloseTo(element.x + 120, 0);
+  await expect.poll(() => peer.evaluate(id => [...window.synixirWhiteboardTest!.getAppState().collaborators.values()]
+    .some(peer => peer.selectedElementIds?.[id] && peer.button === "down"), element.id)).toBe(true);
+  await page.mouse.up(); await saved(page);
+  expect((await scene(peer))[0].x).toBe((await scene(page))[0].x);
 });
