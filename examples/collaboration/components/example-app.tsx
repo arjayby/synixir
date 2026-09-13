@@ -28,6 +28,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { example, type ExampleKind } from "@/lib/examples";
+import { useTheme } from "@/lib/theme";
 import {
   api,
   explain,
@@ -48,7 +49,7 @@ export function ExampleApp({ kind }: { kind: ExampleKind }) {
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [dark, setDark] = useState(false);
+  const dark = useTheme() === "dark";
   const cleanup = useRef<() => void>(() => {});
   const unsaved = useRef<() => boolean>(() => false);
 
@@ -58,7 +59,6 @@ export function ExampleApp({ kind }: { kind: ExampleKind }) {
     setRoomId(id);
     try {
       const value = localStorage.getItem("synixir:theme") === "dark";
-      setDark(value);
       document.documentElement.classList.toggle("dark", value);
     } catch {
       /* Optional preference. */
@@ -141,7 +141,6 @@ export function ExampleApp({ kind }: { kind: ExampleKind }) {
   }
   function theme() {
     const value = !dark;
-    setDark(value);
     document.documentElement.classList.toggle("dark", value);
     try {
       localStorage.setItem("synixir:theme", value ? "dark" : "light");

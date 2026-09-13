@@ -15,6 +15,7 @@ import { canvasSize, colors, createFlowchartModel } from "./model.ts";
 import { connectionPath } from "./geometry.ts";
 import { createFlowchartAdapter, kindLabel, type FlowchartAdapter, type FlowEdge, type FlowNode } from "./adapter.ts";
 import { createFlowchartPresence, type FlowchartPresence } from "./presence.ts";
+import { useTheme } from "../lib/theme.ts";
 
 const AdapterContext = createContext<FlowchartAdapter | null>(null);
 const extent: [[number, number], [number, number]] = [[0, 0], [canvasSize.width, canvasSize.height]];
@@ -109,6 +110,7 @@ function Presence({ adapter, presence }: { adapter: FlowchartAdapter; presence: 
 }
 
 function Canvas({ adapter, presence }: { adapter: FlowchartAdapter; presence: FlowchartPresence }) {
+  const theme = useTheme();
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot);
   const flow = useReactFlow<FlowNode, FlowEdge>();
   const { zoom } = useViewport();
@@ -165,7 +167,7 @@ function Canvas({ adapter, presence }: { adapter: FlowchartAdapter; presence: Fl
         onNodeDragStart={onDragStart} onNodeDragStop={onDragStop} onConnect={onConnect} isValidConnection={validConnection}
         nodesDraggable={!state.readOnly && !state.picking} nodesConnectable={!state.readOnly} nodesFocusable edgesFocusable
         deleteKeyCode={null} multiSelectionKeyCode={null} selectionKeyCode={null} selectNodesOnDrag nodeDragThreshold={0} nodeExtent={extent}
-        ariaLabelConfig={ariaLabels} defaultViewport={defaultViewport} minZoom={0.25} maxZoom={2} edgesReconnectable={false} colorMode="system">
+        ariaLabelConfig={ariaLabels} defaultViewport={defaultViewport} minZoom={0.25} maxZoom={2} edgesReconnectable={false} colorMode={theme}>
         <Background gap={24} />
         <Controls showInteractive={false} />
         <MiniMap style={minimapStyle} pannable zoomable />
