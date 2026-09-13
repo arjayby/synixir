@@ -96,7 +96,7 @@ test("awareness shows participants and selections and removes them on departure"
     await insertAtStart(bob, "Before ");
     await expectText(alice, "Before Hello everyone");
     await expect(bob.locator(".cm-ySelection")).toHaveText("Hello");
-    await alice.getByLabel("Room ID", { exact: true }).focus();
+    await alice.getByRole("button", { name: "Select example", exact: true }).focus();
     await expect(bob.locator(".cm-ySelectionCaret")).toHaveCount(0);
 
     await alice.getByRole("button", { name: "Disconnect", exact: true }).click();
@@ -126,6 +126,7 @@ test("offline edits prompt before leaving and survive cancelling room navigation
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await insertAtStart(page, "Keep this draft");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
+  await page.getByRole("button", { name: `Room details: ${room}` }).click();
   await page.getByLabel("Room ID", { exact: true }).fill(`other-${randomUUID()}`);
   const dialogPromise = page.waitForEvent("dialog");
   await page.getByRole("button", { name: "Open room", exact: true }).click({ noWaitAfter: true });
@@ -133,6 +134,7 @@ test("offline edits prompt before leaving and survive cancelling room navigation
   expect(dialog.type()).toBe("beforeunload");
   await dialog.dismiss();
   await expect(page).toHaveURL(`${baseURL}/?room=${room}`);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await expectText(page, "Keep this draft");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.locator("#save-status")).toHaveText("Saved");

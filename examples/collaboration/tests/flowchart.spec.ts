@@ -107,7 +107,8 @@ test("flowchart merges offline edits, restores nodes and arrows after restart, a
   const fresh = await context.newPage(); await fresh.goto(url); await saved(fresh);
   await expect.poll(() => position(node(fresh, "Process: Draft"))).toEqual(moved);
   await expect(fresh.locator(".flow-edge-label")).toHaveText("Approved");
-  await fresh.getByRole("link", { name: "Try the whiteboard", exact: true }).click();
+  await fresh.getByRole("button", { name: "Select example", exact: true }).click();
+  await fresh.getByRole("menuitem", { name: "Whiteboard", exact: true }).click();
   await expect(fresh).toHaveURL(`${baseURL}/whiteboard.html?room=${roomId}`); await saved(fresh);
   await expect(fresh.locator(".whiteboard-object")).toHaveCount(0);
 });

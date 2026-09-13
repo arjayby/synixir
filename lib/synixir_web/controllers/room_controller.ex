@@ -4,6 +4,7 @@ defmodule SynixirWeb.RoomController do
   plug :require_account
 
   def index(conn, _), do: respond(conn, RoomAccess.list_rooms(hash(conn)))
+  def show(conn, %{"room_id" => room}), do: respond(conn, RoomAccess.info(room, hash(conn)))
 
   def create(conn, params),
     do: respond(conn, RoomAccess.create_room(params["room_id"], hash(conn)))

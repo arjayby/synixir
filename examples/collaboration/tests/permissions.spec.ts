@@ -16,10 +16,13 @@ test("owners manage private rooms and viewers cannot edit", async ({ page, brows
   await signIn(page, username("owner"), "Create account");
   await expect(page.getByRole("heading", { name: "Your rooms", exact: true })).toBeVisible();
   const room = `private-${randomUUID()}`;
+  await page.getByRole("button", { name: "Create a room", exact: true }).click();
   await page.getByLabel("New room ID").fill(room);
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   await connected(page);
+  await page.getByRole("button", { name: `Room details: ${room}` }).click();
   await expect(page.locator("#role-label")).toHaveText("owner");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await insertAtStart(page, "Owner's saved text");
   await expect(page.locator("#save-status")).toHaveText("Saved");
   const viewerContext = await browser.newContext();
@@ -29,6 +32,7 @@ test("owners manage private rooms and viewers cannot edit", async ({ page, brows
     await reader.goto(`${baseURL}/?room=${room}`);
     await expect(reader.locator("#status")).toHaveText("Access expired or denied");
     await expectText(reader, "");
+    await page.getByRole("button", { name: "Manage access", exact: true }).click();
     await page.getByLabel("Account username", { exact: true }).fill(viewer.username);
     await page.getByLabel("Role", { exact: true }).selectOption("viewer");
     await page.getByRole("button", { name: "Grant access", exact: true }).click();
@@ -47,9 +51,12 @@ test("owners manage private rooms and viewers cannot edit", async ({ page, brows
     await connected(reader);
     await insertAtStart(reader, "Editor: ");
     await expect(reader.locator("#save-status")).toHaveText("Saved");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expectText(page, "Editor: Owner's saved text");
+    await page.getByRole("button", { name: "Manage access", exact: true }).click();
     await page.getByRole("button", { name: `Remove ${viewer.username}`, exact: true }).click();
     await expect(reader.locator("#status")).toContainText("Access changed");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await insertAtStart(page, "Private again. ");
     await expect(page.locator("#save-status")).toHaveText("Saved");
     await expectText(reader, "Editor: Owner's saved text");
@@ -71,7 +78,8 @@ test("signing out clears every tab before a different account signs in", async (
   const second = await context.newPage();
   await second.goto(url);
   await connected(second);
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
   for (const tab of [page, second]) {
     await expect(tab.locator("#auth-panel")).toBeVisible();
     await expect(tab.locator("#editor")).toHaveCount(0);
@@ -79,7 +87,8 @@ test("signing out clears every tab before a different account signs in", async (
   await signIn(page, username("other"), "Create account");
   await expect(page.locator("#status")).toHaveText("Access expired or denied");
   await expectText(page, "");
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
   await signIn(page, owner.username);
   await connected(page);
   await expectText(page, "Private account document");

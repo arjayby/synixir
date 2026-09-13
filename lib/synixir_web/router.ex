@@ -30,6 +30,7 @@ defmodule SynixirWeb.Router do
     post "/accounts", SessionController, :register
     get "/rooms", RoomController, :index
     post "/rooms", RoomController, :create
+    get "/rooms/:room_id", RoomController, :show
     post "/rooms/:room_id/token", RoomController, :token
     get "/rooms/:room_id/members", RoomController, :members
     put "/rooms/:room_id/members/:username", RoomController, :put_member

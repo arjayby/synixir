@@ -13,7 +13,11 @@ export default defineConfig({
   webServer: [
     {
       command: `npm run dev -- --port ${frontendPort}`,
-      env: { NEXT_PUBLIC_SYNIXIR_BROWSER_TEST: "true", SYNIXIR_ENDPOINT: backendURL },
+      env: {
+        NEXT_PUBLIC_SYNIXIR_BROWSER_TEST: "true",
+        SYNIXIR_ENDPOINT: backendURL,
+        SYNIXIR_NEXT_DIST_DIR: ".next-browser-test",
+      },
       url: frontendURL,
       reuseExistingServer: false,
       gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },

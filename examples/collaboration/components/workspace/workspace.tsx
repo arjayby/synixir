@@ -1,14 +1,65 @@
 "use client";
 import { inspectForTest } from "@/lib/browser-test";
-import { memo, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+  type ReactNode,
+} from "react";
 import { SynixirRoom, type RoomState } from "@synixir/client";
-import { ExternalLink, ShieldCheck, Undo2, Redo2, Users } from "lucide-react";
+import {
+  Check,
+  CircleHelp,
+  ExternalLink,
+  Plus,
+  ShieldCheck,
+  Undo2,
+  Redo2,
+  Users,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { PlaygroundHeader } from "@/components/playground-header";
+import { RoomDialog } from "@/components/room-dialog";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { api, explain, type User, type Member, type Session } from "@/lib/api";
 import { example, type ExampleKind } from "@/lib/examples";
@@ -57,7 +108,9 @@ const errors: Record<string, string> = {
   timeout:
     "The save acknowledgement did not arrive. Disconnect and connect again to confirm your edits. Keep this tab open.",
 };
-async function loadSurface(kind: ExampleKind): Promise<(room: SynixirRoom) => Surface> {
+async function loadSurface(
+  kind: ExampleKind,
+): Promise<(room: SynixirRoom) => Surface> {
   switch (kind) {
     case "kanban":
       return (await import("@/kanban/board")).createBoard;
@@ -73,7 +126,8 @@ async function loadSurface(kind: ExampleKind): Promise<(room: SynixirRoom) => Su
       return (await import("@/rich-text/editor")).createRichText;
     default: {
       const { createEditor } = await import("@/editor");
-      return (room) => createEditor(room.doc.getText("content"), room.awareness);
+      return (room) =>
+        createEditor(room.doc.getText("content"), room.awareness);
     }
   }
 }
@@ -81,17 +135,15 @@ async function loadSurface(kind: ExampleKind): Promise<(room: SynixirRoom) => Su
 const SurfaceHost = memo(function SurfaceHost({
   title,
   hint,
-  roomId,
 }: {
   title: string;
   hint: string;
-  roomId: string;
 }) {
   return (
     <section className="document-panel" aria-label={title}>
       <div className="editor-toolbar">
         <span id="document-title" className="document-title">
-          {roomId}
+          {title}
         </span>
         <div role="group" aria-label="Edit history" className="flex gap-1">
           <Button id="undo" type="button" variant="ghost" size="sm" disabled>
@@ -107,7 +159,7 @@ const SurfaceHost = memo(function SurfaceHost({
       <div id="editor" className="surface" />
       <p id="board-announcement" className="sr-only" role="status" />
       <div className="editor-footer">
-        <span>{hint}</span>
+        <span id="editor-help">{hint}. Undo affects your own changes.</span>
         <span id="word-count" className="text-xs" />
       </div>
     </section>
@@ -124,19 +176,35 @@ interface Props {
   user: User;
   cleanupRef: RefObject<() => void>;
   unsavedRef: RefObject<() => boolean>;
+  accountMenu: ReactNode;
+  accountError: ReactNode;
 }
-export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props) {
+export function Workspace({
+  kind,
+  roomId,
+  user,
+  cleanupRef,
+  unsavedRef,
+  accountMenu,
+  accountError,
+}: Props) {
   const selected = example(kind);
   const [state, setState] = useState<RoomState>(initial);
   const [peers, setPeers] = useState<Peer[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberError, setMemberError] = useState("");
+  const [memberPending, setMemberPending] = useState(false);
+  const [membersLoaded, setMembersLoaded] = useState(false);
   const [startupError, setStartupError] = useState("");
   const [title, setTitle] = useState("");
   const roomRef = useRef<SynixirRoom | null>(null);
   const surfaceRef = useRef<Surface | null>(null);
-  const frozen = state.error?.code === "access_changed" || state.error?.code === "account_changed";
-  const active = ["connected", "connecting", "reconnecting"].includes(state.connection);
+  const frozen =
+    state.error?.code === "access_changed" ||
+    state.error?.code === "account_changed";
+  const active = ["connected", "connecting", "reconnecting"].includes(
+    state.connection,
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -189,10 +257,16 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
       const presence = () => {
         const online = room.state.connection === "connected";
         const list: Peer[] = [...room.awareness.getStates()]
-          .filter(([id, value]) => value.user && (online || id === room.awareness.clientID))
+          .filter(
+            ([id, value]) =>
+              value.user && (online || id === room.awareness.clientID),
+          )
           .map(([id, value]) => ({
             id,
-            name: typeof value.user.name === "string" ? value.user.name.slice(0, 32) : "Guest",
+            name:
+              typeof value.user.name === "string"
+                ? value.user.name.slice(0, 32)
+                : "Guest",
             local: id === room.awareness.clientID,
           }))
           .sort((a, b) => (a.local ? -1 : b.local ? 1 : a.id - b.id));
@@ -213,7 +287,10 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
         if (next.error?.code === "account_changed") {
           dispose();
           location.reload();
-        } else if (next.error?.code === "access_changed" && !checkedRevocation) {
+        } else if (
+          next.error?.code === "access_changed" &&
+          !checkedRevocation
+        ) {
           checkedRevocation = true;
           void api<Session>("/api/session")
             .then((session) => {
@@ -238,16 +315,26 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
 
   const memberPath = `/api/rooms/${encodeURIComponent(roomId)}/members`;
   async function loadMembers() {
+    if (!state.role || frozen) return;
     try {
-      setMembers((await api<{ data: Member[] }>(memberPath)).data);
+      setMembers(
+        (
+          await api<{ data: { members: Member[] } }>(
+            `/api/rooms/${encodeURIComponent(roomId)}`,
+          )
+        ).data.members,
+      );
+      setMembersLoaded(true);
+      setMemberError("");
     } catch (error) {
       setMemberError(explain(error));
     }
   }
   useEffect(() => {
-    if (state.role === "owner") void loadMembers();
-  }, [state.role, memberPath]);
+    if (state.role && !frozen) void loadMembers();
+  }, [state.role, memberPath, frozen]);
   async function changeMember(username: string, nextRole: string | null) {
+    setMemberPending(true);
     try {
       await api(
         `${memberPath}/${encodeURIComponent(username)}`,
@@ -258,6 +345,8 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
       await loadMembers();
     } catch (error) {
       setMemberError(explain(error));
+    } finally {
+      setMemberPending(false);
     }
   }
   function grant(event: FormEvent<HTMLFormElement>) {
@@ -279,7 +368,8 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
         ? "Access expired or denied"
         : state.error?.code === "timeout"
           ? "Connection timed out"
-          : (errors[state.error?.code ?? ""] ?? "Document sync failed. Keep this tab open."));
+          : (errors[state.error?.code ?? ""] ??
+            "Document sync failed. Keep this tab open."));
   const saveHelp =
     state.saveStatus === "failed"
       ? (errors[state.saveError ?? ""] ??
@@ -288,237 +378,387 @@ export function Workspace({ kind, roomId, user, cleanupRef, unsavedRef }: Props)
         ? "Keep this tab open until Saved appears. Offline edits stay in this tab until you reconnect."
         : "Saved edits stay in this room after everyone leaves.";
 
+  const online = state.connection === "connected";
+  const onlineNames = new Set(online ? peers.map((peer) => peer.name) : []);
+  const roster = membersLoaded
+    ? members.map((member) => ({ name: member.username, role: member.role }))
+    : [...new Set(peers.map((peer) => peer.name))].map((name) => ({
+        name,
+        role: name === user.username ? state.role : null,
+      }));
+  const connectionAction = frozen
+    ? "Reload"
+    : active
+      ? "Disconnect"
+      : "Connect";
+  const connectionHelp = online
+    ? "You are online. Changes and presence are shared with everyone in this room."
+    : frozen
+      ? "Your access has changed. Reload to check your current permissions. Copy any unsaved draft before reloading."
+      : state.connection === "error"
+        ? "The room could not connect. Review the message above before trying again."
+        : active
+          ? "Connecting to the room. Your draft stays in this tab while the connection is restored."
+          : "You are offline. Keep this tab open to preserve any unsaved edits.";
+  const roomInfo = (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Badge variant="outline">
+          <ShieldCheck data-icon="inline-start" />
+          <span id="role-label">{state.role ?? "Checking access"}</span>
+        </Badge>
+        <span className="text-muted-foreground">
+          {membersLoaded
+            ? `${members.length} ${members.length === 1 ? "member" : "members"} · ${onlineNames.size} online`
+            : "Loading members…"}
+        </span>
+      </div>
+      <ul aria-label="Room members" className="flex flex-col gap-3">
+        {roster.map((member) => (
+          <li key={member.name} className="flex items-center gap-3">
+            <Avatar className="size-8">
+              <AvatarFallback>
+                {member.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate">
+                {member.name}
+                {member.name === user.username ? " (you)" : ""}
+              </p>
+              {member.role ? (
+                <p className="text-xs text-muted-foreground">{member.role}</p>
+              ) : null}
+            </div>
+            <span
+              className="member-presence"
+              data-online={onlineNames.has(member.name)}
+            >
+              <span className="status-dot" />
+              {onlineNames.has(member.name) ? "Online" : "Offline"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {memberError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{memberError}</AlertDescription>
+        </Alert>
+      ) : null}
+      <Button variant="outline" asChild>
+        <a
+          id="open-peer"
+          href={`${selected.path}?room=${encodeURIComponent(roomId)}`}
+          target="_blank"
+          rel="noopener"
+        >
+          <ExternalLink data-icon="inline-start" />
+          Open this room in another tab
+        </a>
+      </Button>
+    </>
+  );
+  const membersControl = (
+    <Dialog
+      onOpenChange={(open) => {
+        if (open) void loadMembers();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          className="members-trigger"
+          aria-label="Manage access"
+        >
+          <span className="avatar-stack">
+            {peers.slice(0, 3).map((peer) => (
+              <Avatar key={peer.id} className="size-8">
+                <AvatarFallback>
+                  {peer.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+            {!peers.length ? <Users /> : null}
+          </span>
+          {peers.length > 3 ? (
+            <span>+{peers.length - 3}</span>
+          ) : (
+            <Plus data-icon="inline-end" />
+          )}
+          <span id="participant-count" className="sr-only" aria-live="polite">
+            {online ? `${peers.length} online` : "Offline"}
+          </span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="playground-dialog sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Manage access</DialogTitle>
+          <DialogDescription>
+            Choose who can view and edit{" "}
+            <span className="break-all">{roomId}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        {state.role === "owner" && !frozen ? (
+          <div id="members-panel">
+            <ul id="members-list" className="mb-4 flex flex-col gap-3">
+              {members.map((member) => (
+                <li
+                  key={member.username}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {member.username}
+                  </span>
+                  <NativeSelect
+                    aria-label={`Role for ${member.username}`}
+                    disabled={memberPending || frozen}
+                    value={member.role}
+                    onChange={(event) =>
+                      void changeMember(member.username, event.target.value)
+                    }
+                  >
+                    {["owner", "editor", "viewer"].map((role) => (
+                      <NativeSelectOption key={role} value={role}>
+                        {role}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={memberPending || frozen}
+                    aria-label={`Remove ${member.username}`}
+                    onClick={() => void changeMember(member.username, null)}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <form id="member-form" onSubmit={grant}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="member-username">
+                    Account username
+                  </FieldLabel>
+                  <Input
+                    id="member-username"
+                    name="username"
+                    maxLength={32}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="member-role">Role</FieldLabel>
+                  <NativeSelect
+                    id="member-role"
+                    name="role"
+                    defaultValue="editor"
+                  >
+                    <NativeSelectOption value="editor">
+                      Editor
+                    </NativeSelectOption>
+                    <NativeSelectOption value="viewer">
+                      Viewer
+                    </NativeSelectOption>
+                    <NativeSelectOption value="owner">Owner</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+                <Button disabled={memberPending || frozen}>
+                  <Users data-icon="inline-start" />
+                  Grant access
+                </Button>
+              </FieldGroup>
+            </form>
+            <p
+              id="member-error"
+              className="mt-2 text-sm text-destructive"
+              role="alert"
+            >
+              {memberError}
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-muted-foreground">
+              Only room owners can change access. Ask an owner to invite someone
+              or update your role.
+            </p>
+            {roomInfo}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
-    <div id="collaboration" className={`${kind}-page flex flex-col gap-5`}>
-      <div className="workspace-status">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            <ShieldCheck data-icon="inline-start" />
-            <span id="role-label">{state.role ?? "Checking access"}</span>
-          </Badge>
-          <span id="save-status" className="text-sm text-muted-foreground" aria-live="polite">
-            {saveLabels[state.saveStatus]}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span
-            id="status"
-            role="status"
-            data-state={
-              state.connection === "error"
-                ? "error"
-                : state.connection === "connected"
-                  ? "connected"
-                  : active
-                    ? "connecting"
-                    : "disconnected"
-            }
+    <>
+      <PlaygroundHeader
+        kind={kind}
+        roomId={roomId}
+        accountMenu={accountMenu}
+        membersControl={membersControl}
+        roomControl={
+          <RoomDialog
+            kind={kind}
+            roomId={roomId}
+            onOpen={() => void loadMembers()}
           >
-            {connectionLabel}
-          </span>
-          <Button id="connection" variant="outline" size="sm" onClick={toggle}>
-            {frozen ? "Reload" : active ? "Disconnect" : "Connect"}
+            {roomInfo}
+          </RoomDialog>
+        }
+      />
+      <main
+        id="collaboration"
+        className={cn("playground-content", `${kind}-page`)}
+        aria-label={`${selected.title} playground`}
+      >
+        {accountError}
+        {startupError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{startupError}</AlertDescription>
+          </Alert>
+        ) : null}
+        {kind === "sdk" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle role="heading" aria-level={2}>
+                Shared settings
+              </CardTitle>
+              <CardDescription>
+                A small example of synchronized application state.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="sdk-title">Room title</FieldLabel>
+                  <Input
+                    id="sdk-title"
+                    value={title}
+                    disabled={state.readOnly}
+                    onChange={(event) => {
+                      if (!roomRef.current?.state.readOnly)
+                        roomRef.current?.doc
+                          .getMap<string>("settings")
+                          .set("title", event.target.value);
+                    }}
+                  />
+                </Field>
+                <p id="sdk-state" role="status">
+                  {state.connection} · {state.saveStatus}
+                  {state.error ? ` · ${state.error.code}` : ""}
+                </p>
+                <Button id="sdk-connection" variant="outline" onClick={toggle}>
+                  {active ? "Disconnect" : "Connect"}
+                </Button>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : (
+          <SurfaceHost title={selected.title} hint={selected.hint} />
+        )}
+      </main>
+      <footer className="playground-footer">
+        <div className="footer-connection">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" aria-label="Connection status">
+                {online ? (
+                  <Wifi data-icon="inline-start" />
+                ) : (
+                  <WifiOff data-icon="inline-start" />
+                )}
+                <span
+                  id="status"
+                  role="status"
+                  className="truncate"
+                  data-state={
+                    state.connection === "error"
+                      ? "error"
+                      : online
+                        ? "connected"
+                        : active
+                          ? "connecting"
+                          : "disconnected"
+                  }
+                >
+                  {connectionLabel}
+                </span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Connection status</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="flex flex-col gap-3">
+                    <p id="connection-label">{connectionLabel}</p>
+                    <p>{connectionHelp}</p>
+                    {state.hasUnsavedChanges ||
+                    state.saveStatus === "failed" ? (
+                      <p>{saveHelp}</p>
+                    ) : null}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+                <AlertDialogAction onClick={toggle}>
+                  {connectionAction}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button id="connection" variant="ghost" size="xs" onClick={toggle}>
+            {connectionAction}
           </Button>
         </div>
-      </div>
-      {startupError && (
-        <p role="alert" className="text-destructive">
-          {startupError}
-        </p>
-      )}
-      <div className="workspace-grid">
-        <div className="min-w-0">
-          {kind === "sdk" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle role="heading" aria-level={2}>
-                  Shared settings
-                </CardTitle>
-                <CardDescription>
-                  A small example of synchronized application state.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="sdk-title">Room title</FieldLabel>
-                    <Input
-                      id="sdk-title"
-                      value={title}
-                      disabled={state.readOnly}
-                      onChange={(event) => {
-                        if (!roomRef.current?.state.readOnly)
-                          roomRef.current?.doc
-                            .getMap<string>("settings")
-                            .set("title", event.target.value);
-                      }}
-                    />
-                  </Field>
-                  <p id="sdk-state" role="status">
-                    {state.connection} · {state.saveStatus}
-                    {state.error ? ` · ${state.error.code}` : ""}
-                  </p>
-                  <Button id="sdk-connection" variant="outline" onClick={toggle}>
-                    {active ? "Disconnect" : "Connect"}
-                  </Button>
-                </FieldGroup>
-              </CardContent>
-            </Card>
-          ) : (
-            <SurfaceHost title={selected.title} hint={selected.hint} roomId={roomId} />
-          )}
-          <p id="save-help" className="mt-3 text-xs text-muted-foreground">
-            {saveHelp}
-          </p>
-        </div>
-        <aside className="room-sidebar" aria-label="Room details">
-          <Card>
-            <CardHeader>
-              <CardTitle role="heading" aria-level={2}>
-                Room
-              </CardTitle>
-              <CardDescription>A shared place for this work.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form method="get" id="room-form">
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="room">Room ID</FieldLabel>
-                    <Input
-                      id="room"
-                      name="room"
-                      defaultValue={roomId}
-                      maxLength={128}
-                      pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"
-                      required
-                    />
-                  </Field>
-                  <Button type="submit" variant="outline">
-                    Open room
-                  </Button>
-                </FieldGroup>
-              </form>
-              <p className="mt-3 text-xs text-muted-foreground">
-                An owner must grant access before someone can open this room.{" "}
-                <a className="underline" href={selected.path}>
-                  All rooms
-                </a>
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle role="heading" aria-level={2}>
-                <span className="flex items-center justify-between">
-                  <span>In this room</span>
-                  <span
-                    id="participant-count"
-                    className="text-xs font-normal text-muted-foreground"
-                    aria-live="polite"
-                  >
-                    {state.connection === "connected" ? `${peers.length} online` : "Offline"}
-                  </span>
+        <span className="playground-caption">Playground</span>
+        <div className="footer-save">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Save status and help"
+                aria-describedby="save-help"
+              >
+                {state.saveStatus === "saved" ? (
+                  <Check data-icon="inline-start" />
+                ) : (
+                  <CircleHelp data-icon="inline-start" />
+                )}
+                <span id="save-status" aria-live="polite">
+                  {saveLabels[state.saveStatus]}
                 </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul id="participants" aria-label="Participants" className="flex flex-col gap-3">
-                {peers.map((peer) => (
-                  <li key={peer.id} className="flex items-center gap-2">
-                    <Avatar className="size-7">
-                      <AvatarFallback>{peer.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{peer.name}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {peer.local
-                        ? state.connection === "connected"
-                          ? "You"
-                          : "You · offline"
-                        : "Online"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-4 text-xs text-muted-foreground">
-                You appear as <strong id="your-name">{user.username}</strong>.
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{saveLabels[state.saveStatus]}</DialogTitle>
+                <DialogDescription>{saveHelp}</DialogDescription>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                {selected.hint}. Undo affects your own changes.
               </p>
-            </CardContent>
-          </Card>
-          {state.role === "owner" && (
-            <Card id="members-panel">
-              <CardHeader>
-                <CardTitle role="heading" aria-level={2}>
-                  Manage access
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul id="members-list" className="mb-4 flex flex-col gap-3">
-                  {members.map((member) => (
-                    <li key={member.username} className="flex flex-wrap items-center gap-2">
-                      <span className="w-full truncate text-sm">{member.username}</span>
-                      <NativeSelect
-                        aria-label={`Role for ${member.username}`}
-                        value={member.role}
-                        onChange={(event) => void changeMember(member.username, event.target.value)}
-                      >
-                        {["owner", "editor", "viewer"].map((role) => (
-                          <NativeSelectOption key={role} value={role}>
-                            {role}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Remove ${member.username}`}
-                        onClick={() => void changeMember(member.username, null)}
-                      >
-                        Remove
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-                <form id="member-form" onSubmit={grant}>
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel htmlFor="member-username">Account username</FieldLabel>
-                      <Input id="member-username" name="username" maxLength={32} required />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="member-role">Role</FieldLabel>
-                      <NativeSelect id="member-role" name="role" defaultValue="editor">
-                        <NativeSelectOption value="editor">Editor</NativeSelectOption>
-                        <NativeSelectOption value="viewer">Viewer</NativeSelectOption>
-                        <NativeSelectOption value="owner">Owner</NativeSelectOption>
-                      </NativeSelect>
-                    </Field>
-                    <Button>
-                      <Users data-icon="inline-start" />
-                      Grant access
-                    </Button>
-                  </FieldGroup>
-                </form>
-                <p id="member-error" className="mt-2 text-sm text-destructive" role="alert">
-                  {memberError}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-          <p id="editor-help" className="text-xs text-muted-foreground">
-            {selected.hint}. Undo affects your own changes.
-          </p>
-          <a
-            id="open-peer"
-            href={`${selected.path}?room=${encodeURIComponent(roomId)}`}
-            target="_blank"
-            rel="noopener"
-            className="flex items-center gap-2 text-xs text-muted-foreground"
-          >
-            <ExternalLink className="size-3" />
-            Open this room in another tab
-          </a>
-        </aside>
-      </div>
-    </div>
+            </DialogContent>
+          </Dialog>
+          <span id="save-help" className="sr-only">
+            {saveHelp}
+          </span>
+        </div>
+      </footer>
+      <ul id="participants" aria-label="Participants" className="sr-only">
+        {peers.map((peer) => (
+          <li key={peer.id}>
+            {peer.name} ·{" "}
+            {peer.local ? (online ? "You" : "You · offline") : "Online"}
+          </li>
+        ))}
+      </ul>
+      <span id="your-name" className="sr-only">
+        {user.username}
+      </span>
+    </>
   );
 }

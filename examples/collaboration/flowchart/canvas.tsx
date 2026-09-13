@@ -188,7 +188,6 @@ function Canvas({ adapter, presence }: { adapter: FlowchartAdapter; presence: Fl
 
 export function createFlowchart(room: SynixirRoom) {
   const host = document.querySelector<HTMLElement>("#editor")!;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const adapter = createFlowchartAdapter(createFlowchartModel(room.doc));
   const presence = createFlowchartPresence(room, adapter);
   const root = createRoot(host);

@@ -509,6 +509,7 @@ bearer grant.
 | `DELETE /api/session` | Revoke the current session and sign out |
 | `GET /api/rooms` | List the account's active memberships |
 | `POST /api/rooms` | Create `room_id` and its initial owner atomically |
+| `GET /api/rooms/:room_id` | Room info and member usernames/roles for current room members |
 | `POST /api/rooms/:room_id/token` | Issue a grant using current session and membership |
 | `GET /api/rooms/:room_id/members` | Owner-only membership list |
 | `PUT /api/rooms/:room_id/members/:username` | Owner grants or changes `role` |

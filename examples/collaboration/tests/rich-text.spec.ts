@@ -116,7 +116,8 @@ test("rich text supports lists and quotes and keeps plain text content and curso
   await expect(document(page).locator(".rich-caret")).toHaveCount(0);
   await document(page).click();
   await expect(plain.locator(".cm-ySelectionInfo")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Try the text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.getByRole("button", { name: "Select example", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
 });
 
 test("rich text viewer and revoked editor cannot edit, format, or undo; mobile fits", async ({ page, browser, baseURL }) => {

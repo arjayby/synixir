@@ -135,6 +135,7 @@ test("board navigation stays on Kanban and the layout fits mobile", async ({ pag
   await register(page.request, baseURL);
   await page.goto(`${baseURL}/kanban.html`);
   const roomId = `navigation-${randomUUID()}`;
+  await page.getByRole("button", { name: "Create a room", exact: true }).click();
   await page.getByLabel("New room ID").fill(roomId);
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   await expect(page).toHaveURL(`${baseURL}/kanban.html?room=${roomId}`);
@@ -148,7 +149,10 @@ test("board navigation stays on Kanban and the layout fits mobile", async ({ pag
   await expect(page.locator('[data-column="done"]')).toContainText("Mobile planning");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("kanban-mobile.png"), fullPage: true });
-  await expect(page.getByRole("link", { name: "Try the text editor" })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.getByRole("button", { name: "Select example", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: `Room details: ${roomId}` }).click();
   await page.getByRole("link", { name: "All rooms" }).click();
   await expect(page).toHaveURL(`${baseURL}/kanban.html`);
   await page.getByRole("link", { name: `${roomId} · owner`, exact: true }).click();

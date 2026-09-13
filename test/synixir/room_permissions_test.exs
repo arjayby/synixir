@@ -40,6 +40,27 @@ defmodule Synixir.RoomPermissionsTest do
     assert {:ok, _} = RoomAccess.members(ctx.room, ctx.editor.hash)
   end
 
+  test "room info lists members for every role but rejects outsiders and revoked members", ctx do
+    for actor <- [ctx.owner, ctx.editor, ctx.viewer] do
+      assert {:ok, %{id: room, members: members}} = RoomAccess.info(ctx.room, actor.hash)
+      assert room == ctx.room
+      assert length(members) == 3
+      assert Enum.all?(members, &(Enum.sort(Map.keys(&1)) == [:role, :username]))
+      assert Enum.any?(members, &(&1.username == ctx.viewer.user.username))
+    end
+
+    outsider = account_fixture("outsider")
+    assert {:error, :unauthorized} = RoomAccess.info(ctx.room, outsider.hash)
+    assert {:error, :unauthorized} = RoomAccess.info("missing-room", ctx.viewer.hash)
+
+    assert {:ok, _} =
+             RoomAccess.set_member(ctx.room, ctx.owner.hash, ctx.viewer.user.username, nil)
+
+    assert {:error, :unauthorized} = RoomAccess.info(ctx.room, ctx.viewer.hash)
+    assert {:ok, %{members: members}} = RoomAccess.info(ctx.room, ctx.editor.hash)
+    assert length(members) == 2
+  end
+
   test "viewers receive sync without reverse upload and cannot save through any event", ctx do
     {viewer, _grant} = join_actor(ctx.room, ctx.viewer)
     {:ok, doc} = Documents.open(ctx.room)

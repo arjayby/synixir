@@ -1,4 +1,4 @@
-# Next.js collaboration examples
+# Synixir playground
 
 This app uses TypeScript, React, Next.js App Router, shadcn/ui (Radix), and
 Tailwind CSS. Elixir/Phoenix owns accounts, room permissions, WebSockets, and
@@ -23,6 +23,14 @@ The editor/canvas modules mount inside a React-owned host and release their
 listeners and bindings when that host unmounts. They load only when selected.
 `components/ui/` contains the generated shadcn primitives, and
 `app/globals.css` contains Tailwind, theme tokens, and shared layout styles.
+
+The playground gives the selected example the full workspace. In the header,
+the example dropdown keeps the current room when switching examples. Click the
+room ID for room information, the full member roster with live online status,
+and a second tab for creating a room. The avatar group opens access management;
+only owners can grant, change, or remove access. The username menu contains
+theme switching and sign out. Connection details use a shadcn alert dialog in
+the footer, alongside save status and help.
 
 ## Libraries by example
 
@@ -58,6 +66,8 @@ preserved in development and production. Navigation uses full page loads to
 retain the unsaved-edit warning and tear down old room connections.
 
 Browser tests run on ports 5174 and 4010 with a separate Phoenix test database.
+They use `.next-browser-test` so an existing development server can stay open.
+Set `SYNIXIR_NEXT_DIST_DIR` to use another Next.js build directory.
 When testing separate Git worktrees in parallel, set `SYNIXIR_TEST_FRONTEND_PORT`
 and `SYNIXIR_TEST_BACKEND_PORT` to a unique pair for each run. The test server's
 origin allowlist follows the selected frontend port.

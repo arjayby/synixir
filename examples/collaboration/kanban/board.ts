@@ -4,7 +4,6 @@ import { mountBoardView } from "./board-view.tsx";
 
 export function createBoard(room: SynixirRoom) {
   const root = document.querySelector<HTMLElement>("#editor")!;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const model = createBoardModel(room.doc);
   const events = new AbortController();
   const listen = <K extends keyof DocumentEventMap>(target: EventTarget, event: K, handler: (event: DocumentEventMap[K]) => void, capture = false) => target.addEventListener(event, handler as EventListener, { signal: events.signal, capture });

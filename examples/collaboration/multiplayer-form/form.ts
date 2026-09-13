@@ -9,7 +9,6 @@ import { createBriefFormState, type FormFieldName } from "./form-state.ts";
 
 export function createMultiplayerForm(room: SynixirRoom) {
   const root = document.querySelector<HTMLElement>("#editor")!;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const model = createFormModel(room.doc);
   const briefForm = createBriefFormState(room.doc, model);
   const shell = createFormShell(root);

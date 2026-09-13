@@ -36,6 +36,8 @@ __pycache__/
 # TypeScript and Next.js build output.
 /packages/client/dist/
 /examples/collaboration/.next/
+/examples/collaboration/.next-browser-test/
+/examples/collaboration/.next-build-check/
 /examples/collaboration/out/
 *.tsbuildinfo
 /examples/collaboration/next-env.d.ts

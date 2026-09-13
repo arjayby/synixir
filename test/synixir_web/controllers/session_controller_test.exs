@@ -77,6 +77,7 @@ defmodule SynixirWeb.SessionControllerTest do
   test "anonymous requests cannot create rooms or manage memberships", %{conn: conn} do
     for {method, path, body} <- [
           {:post, "/api/rooms", %{room_id: "anonymous"}},
+          {:get, "/api/rooms/anonymous", %{}},
           {:post, "/api/rooms/anonymous/token", %{user_id: "owner"}},
           {:put, "/api/rooms/anonymous/members/alice", %{role: "owner"}}
         ] do
