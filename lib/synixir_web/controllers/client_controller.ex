@@ -2,7 +2,6 @@ defmodule SynixirWeb.ClientController do
   use SynixirWeb, :controller
 
   def index(conn, _), do: page(conn, "index.html")
-  def settings(conn, _), do: page(conn, "sdk.html")
   def kanban(conn, _), do: page(conn, "kanban.html")
   def whiteboard(conn, _), do: page(conn, "whiteboard.html")
   def rich_text(conn, _), do: page(conn, "rich-text.html")

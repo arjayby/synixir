@@ -24,13 +24,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -196,7 +189,6 @@ export function Workspace({
   const [memberPending, setMemberPending] = useState(false);
   const [membersLoaded, setMembersLoaded] = useState(false);
   const [startupError, setStartupError] = useState("");
-  const [title, setTitle] = useState("");
   const roomRef = useRef<SynixirRoom | null>(null);
   const surfaceRef = useRef<Surface | null>(null);
   const frozen =
@@ -210,7 +202,6 @@ export function Workspace({
     let disposed = false;
     let stopState = () => {};
     let stopPresence = () => {};
-    let stopTitle = () => {};
     let current: SynixirRoom | null = null;
     const unload = (event: BeforeUnloadEvent) => {
       if (current?.state.hasUnsavedChanges) {
@@ -223,7 +214,6 @@ export function Workspace({
       disposed = true;
       stopState();
       stopPresence();
-      stopTitle();
       surfaceRef.current?.();
       surfaceRef.current = null;
       void current?.destroy();
@@ -235,7 +225,7 @@ export function Workspace({
     window.addEventListener("beforeunload", unload);
     window.addEventListener("pagehide", dispose);
     void (async () => {
-      const create = kind === "sdk" ? null : await loadSurface(kind);
+      const create = await loadSurface(kind);
       if (disposed) return;
       current = new SynixirRoom({ roomId, userId: user.id });
       const room = current;
@@ -246,13 +236,7 @@ export function Workspace({
         color: "#3565b0",
         colorLight: "#3565b026",
       });
-      surfaceRef.current = create?.(room) ?? null;
-      const settings = room.doc.getMap<string>("settings");
-      if (kind === "sdk") {
-        const changed = () => setTitle(settings.get("title") ?? "");
-        settings.observe(changed);
-        stopTitle = () => settings.unobserve(changed);
-      }
+      surfaceRef.current = create(room);
       let previousRoster = "";
       const presence = () => {
         const online = room.state.connection === "connected";
@@ -619,45 +603,7 @@ export function Workspace({
             <AlertDescription>{startupError}</AlertDescription>
           </Alert>
         ) : null}
-        {kind === "sdk" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle role="heading" aria-level={2}>
-                Shared settings
-              </CardTitle>
-              <CardDescription>
-                A small example of synchronized application state.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="sdk-title">Room title</FieldLabel>
-                  <Input
-                    id="sdk-title"
-                    value={title}
-                    disabled={state.readOnly}
-                    onChange={(event) => {
-                      if (!roomRef.current?.state.readOnly)
-                        roomRef.current?.doc
-                          .getMap<string>("settings")
-                          .set("title", event.target.value);
-                    }}
-                  />
-                </Field>
-                <p id="sdk-state" role="status">
-                  {state.connection} · {state.saveStatus}
-                  {state.error ? ` · ${state.error.code}` : ""}
-                </p>
-                <Button id="sdk-connection" variant="outline" onClick={toggle}>
-                  {active ? "Disconnect" : "Connect"}
-                </Button>
-              </FieldGroup>
-            </CardContent>
-          </Card>
-        ) : (
-          <SurfaceHost title={selected.title} hint={selected.hint} />
-        )}
+        <SurfaceHost title={selected.title} hint={selected.hint} />
       </main>
       <footer className="playground-footer">
         <div className="footer-connection">

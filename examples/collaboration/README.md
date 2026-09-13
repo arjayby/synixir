@@ -43,7 +43,6 @@ the footer, alongside save status and help.
 | [Project brief](multiplayer-form/README.md) | React Hook Form, `@hookform/resolvers`, Zod, CodeMirror | Y.Text fields and Y.Map choices |
 | [Flowchart](flowchart/README.md) | `@xyflow/react` | Y.Map nodes and connections |
 | [Table](table/README.md) | `react-data-grid`, CodeMirror | Y.Text cells and Y.Map schema |
-| Shared settings | Native controls and `@synixir/client` | Y.Map |
 
 Every example uses the same Synixir/Phoenix connection and persistence. The UI
 packages do not introduce another collaboration service. The text, rich-text,
@@ -61,7 +60,7 @@ npm run build
 The build compiles the SDK to `packages/client/dist` and exports Next.js pages
 and assets to `examples/collaboration/out`. Docker copies this export into
 Phoenix's `priv/static`; the runtime needs no Node process. Navigation uses
-URLs such as `/kanban?room=planning` and `/sdk?room=planning` in development and
+URLs such as `/kanban?room=planning` and `/table?room=planning` in development and
 production. Previously shared `.html` links also work. Navigation uses full page
 loads to retain the unsaved-edit warning and tear down old room connections.
 

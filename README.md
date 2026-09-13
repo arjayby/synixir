@@ -183,9 +183,7 @@ transfers, and save tracking; account forms and editor controls stay in the app.
 
 See the [SDK interface and integration guide](packages/client/README.md) for
 installation, connection and save states, cancellation, cleanup, and custom
-access callbacks. `/sdk?room=<room_id>` provides a second small consumer
-that synchronizes a title in a Y.Map without CodeMirror. It uses the same signed-in
-account and room membership as the editor.
+access callbacks.
 
 ## Try the Kanban example
 

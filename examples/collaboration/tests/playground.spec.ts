@@ -50,7 +50,7 @@ test("playground menus, room tabs, connection alerts and save help work together
   await page
     .getByRole("button", { name: "Select example", exact: true })
     .click();
-  await expect(page.getByRole("menuitem")).toHaveCount(8);
+  await expect(page.getByRole("menuitem")).toHaveCount(7);
   await expect(
     page.getByRole("menuitem", { name: "Kanban board", exact: true }),
   ).toHaveAttribute("href", `/kanban?room=${roomId}`);

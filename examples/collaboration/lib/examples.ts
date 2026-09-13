@@ -6,7 +6,6 @@ import {
   Workflow,
   Table2,
   ListChecks,
-  SlidersHorizontal,
 } from "lucide-react";
 export const examples = [
   {
@@ -64,14 +63,6 @@ export const examples = [
     description: "Give your team's information a shared home.",
     icon: Table2,
     hint: "Edit cells together or paste from a spreadsheet",
-  },
-  {
-    id: "sdk",
-    path: "/sdk",
-    title: "Shared settings",
-    description: "One small setting. Every client in sync.",
-    icon: SlidersHorizontal,
-    hint: "A minimal client SDK example",
   },
 ] as const;
 export type ExampleKind = (typeof examples)[number]["id"];

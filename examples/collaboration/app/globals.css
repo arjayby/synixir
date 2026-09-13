@@ -247,8 +247,6 @@
 .editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted-foreground); }
 #collaboration { color: var(--foreground); background: var(--card); }
 #collaboration .document-panel { background: var(--card); }
-.sdk-page { padding: 24px; }
-.sdk-page > [data-slot="card"] { max-width: 600px; margin: 24px auto; }
 .surface > .cm-editor { font-size: 15px; height: 100%; }
 .surface > .cm-editor .cm-content { padding: 28px 30px 70px; font-family: inherit; line-height: 1.8; caret-color: var(--primary); }
 .surface .cm-focused { outline: none; }

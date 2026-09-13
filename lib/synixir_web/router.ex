@@ -2,7 +2,6 @@ defmodule SynixirWeb.Router do
   use SynixirWeb, :router
 
   get "/", SynixirWeb.ClientController, :index
-  get "/sdk", SynixirWeb.ClientController, :settings
   get "/kanban", SynixirWeb.ClientController, :kanban
   get "/whiteboard", SynixirWeb.ClientController, :whiteboard
   get "/rich-text", SynixirWeb.ClientController, :rich_text
@@ -11,7 +10,6 @@ defmodule SynixirWeb.Router do
   get "/table", SynixirWeb.ClientController, :table
 
   # Keep previously shared example links working.
-  get "/sdk.html", SynixirWeb.ClientController, :settings
   get "/kanban.html", SynixirWeb.ClientController, :kanban
   get "/whiteboard.html", SynixirWeb.ClientController, :whiteboard
   get "/rich-text.html", SynixirWeb.ClientController, :rich_text

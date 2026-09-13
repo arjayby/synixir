@@ -1,16 +1,20 @@
 defmodule SynixirWeb.ClientControllerTest do
   use SynixirWeb.ConnCase, async: true
 
+  for route <- ["/sdk", "/sdk.html"] do
+    test "removed example #{route} returns not found", %{conn: conn} do
+      assert get(conn, unquote(route)).status == 404
+    end
+  end
+
   for {route, file} <- [
         {"/", "index.html"},
-        {"/sdk", "sdk.html"},
         {"/kanban", "kanban.html"},
         {"/whiteboard", "whiteboard.html"},
         {"/rich-text", "rich-text.html"},
         {"/multiplayer-form", "multiplayer-form.html"},
         {"/flowchart", "flowchart.html"},
         {"/table", "table.html"},
-        {"/sdk.html", "sdk.html"},
         {"/kanban.html", "kanban.html"},
         {"/whiteboard.html", "whiteboard.html"},
         {"/rich-text.html", "rich-text.html"},
