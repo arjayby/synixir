@@ -40,13 +40,12 @@ the footer, alongside save status and help.
 | [Kanban](kanban/README.md) | `@dnd-kit/react`, `@dnd-kit/collision` | Y.Map cards and sortable placements |
 | [Whiteboard](whiteboard/README.md) | `@excalidraw/excalidraw` | Yjs creation records and field changes |
 | Rich text | Tiptap and its collaboration extension | Y.XmlFragment |
-| [Project brief](multiplayer-form/README.md) | React Hook Form, `@hookform/resolvers`, Zod, CodeMirror | Y.Text fields and Y.Map choices |
+| [Form](multiplayer-form/README.md) | React Hook Form, `@hookform/resolvers`, Zod, CodeMirror | Y.Text fields and Y.Map choices |
 | [Flowchart](flowchart/README.md) | `@xyflow/react` | Y.Map nodes and connections |
 | [Table](table/README.md) | `react-data-grid`, CodeMirror | Y.Text cells and Y.Map schema |
 
 Every example uses the same Synixir/Phoenix connection and persistence. The UI
-packages do not introduce another collaboration service. The text, rich-text,
-and shared-settings examples retain their existing integrations.
+packages do not introduce another collaboration service.
 
 ## Checks and production build
 

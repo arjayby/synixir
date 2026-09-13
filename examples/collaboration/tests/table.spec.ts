@@ -100,7 +100,7 @@ test("table merges disconnected edits to one cell and restores data and schema a
   await expect(display(fresh, "A1")).toHaveText(merged);
   await expect(fresh.getByRole("columnheader", { name: "E · Notes", exact: true })).toBeVisible();
   await fresh.getByRole("button", { name: "Select example", exact: true }).click();
-  await fresh.getByRole("menuitem", { name: "Project brief", exact: true }).click();
+  await fresh.getByRole("menuitem", { name: "Form", exact: true }).click();
   await expect(fresh).toHaveURL(`${baseURL}/multiplayer-form?room=${roomId}`); await saved(fresh);
   await expect(fresh.getByRole("textbox", { name: "Project name", exact: true }).locator(".cm-placeholder")).toBeVisible();
 });

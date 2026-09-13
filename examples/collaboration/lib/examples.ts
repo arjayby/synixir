@@ -43,7 +43,7 @@ export const examples = [
   {
     id: "multiplayer-form",
     path: "/multiplayer-form",
-    title: "Project brief",
+    title: "Form",
     description: "Work through the details, together.",
     icon: ListChecks,
     hint: "Shared fields with live editing presence",
