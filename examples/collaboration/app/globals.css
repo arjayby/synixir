@@ -208,7 +208,7 @@
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   [hidden] { display: none !important; }
 }
-.playground-shell { display: flex; flex-direction: column; height: calc(100dvh - 40px); min-height: 480px; margin: 20px; padding: 0 28px; border: 1px solid var(--border); border-radius: 16px; background: var(--background); }
+.playground-shell { display: flex; flex-direction: column; height: 100dvh; min-height: 480px; padding: 0 28px; background: var(--background); }
 .playground-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 88px; padding: 16px 0; }
 .playground-location { display: flex; align-items: center; min-width: 0; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .location-divider { margin: 0 3px; color: var(--muted-foreground); font-size: 18px; font-weight: 300; }
@@ -279,7 +279,7 @@
 .surface .whiteboard-object { color: #223e33; }
 .surface .shared-table { color: #223e33; }
 @media (max-width: 800px) {
-  .playground-shell { margin: 10px; height: calc(100dvh - 20px); padding: 0 16px; }
+  .playground-shell { padding: 0 16px; }
   .playground-header { gap: 12px; min-height: 80px; }
   .playground-people { gap: 8px; }
   #account-bar { max-width: 140px; }
@@ -288,7 +288,7 @@
   #status { max-width: 120px; }
 }
 @media (max-width: 560px) {
-  .playground-shell { margin: 0; height: 100dvh; border: 0; border-radius: 0; padding: 0 12px; }
+  .playground-shell { padding: 0 12px; }
   .playground-header { flex-wrap: wrap; gap: 8px; padding: 12px 0; }
   .playground-location { max-width: 100%; }
   .room-trigger { max-width: 45vw; }
