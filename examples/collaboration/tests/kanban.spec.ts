@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Page } from "@playwright/test";
 
 async function setup(page: Page, baseURL: string|undefined) {
@@ -8,7 +8,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const roomId = `board-${randomUUID()}`;
   const response = await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId });
   expect(response.ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/kanban.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/kanban?room=${roomId}` };
 }
 const saved = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
 const card = (page: Page, title: string) => page.getByRole("button", { name: `Open card: ${title}`, exact: true });
@@ -67,7 +67,7 @@ test("offline changes converge and saved cards recover after a server crash", as
   await saved(peer);
   await addCard(page, "Review onboarding");
   await expect(card(peer, "Review onboarding")).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await card(page, "Review onboarding").click();
   await page.getByLabel("Status", { exact: true }).selectOption("done");
@@ -77,7 +77,7 @@ test("offline changes converge and saved cards recover after a server crash", as
   await peer.getByLabel("Description").fill("Teammate edited while you were offline.");
   await peer.getByRole("button", { name: "Close card", exact: true }).click();
   await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await saved(page);
   await expect(peer.locator('[data-column="done"]')).toContainText("Review onboarding");
   await expect(card(page, "Review onboarding")).toContainText("Teammate edited while you were offline.");
@@ -133,11 +133,12 @@ test("viewers can inspect cards but cannot edit, and revocation freezes an open 
 
 test("board navigation stays on Kanban and the layout fits mobile", async ({ page, baseURL }, testInfo) => {
   await register(page.request, baseURL);
-  await page.goto(`${baseURL}/kanban.html`);
+  await page.goto(`${baseURL}/kanban`);
   const roomId = `navigation-${randomUUID()}`;
+  await page.getByRole("button", { name: "Create a room", exact: true }).click();
   await page.getByLabel("New room ID").fill(roomId);
   await page.getByRole("button", { name: "Create room", exact: true }).click();
-  await expect(page).toHaveURL(`${baseURL}/kanban.html?room=${roomId}`);
+  await expect(page).toHaveURL(`${baseURL}/kanban?room=${roomId}`);
   await saved(page);
   await addCard(page, "Mobile planning");
   await page.screenshot({ path: testInfo.outputPath("kanban-desktop.png"), fullPage: true });
@@ -148,9 +149,12 @@ test("board navigation stays on Kanban and the layout fits mobile", async ({ pag
   await expect(page.locator('[data-column="done"]')).toContainText("Mobile planning");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("kanban-mobile.png"), fullPage: true });
-  await expect(page.getByRole("link", { name: "Try the text editor" })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.getByRole("button", { name: "Select example", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: `Room details: ${roomId}` }).click();
   await page.getByRole("link", { name: "All rooms" }).click();
-  await expect(page).toHaveURL(`${baseURL}/kanban.html`);
+  await expect(page).toHaveURL(`${baseURL}/kanban`);
   await page.getByRole("link", { name: `${roomId} · owner`, exact: true }).click();
   await saved(page);
   await expect(card(page, "Mobile planning")).toBeVisible();

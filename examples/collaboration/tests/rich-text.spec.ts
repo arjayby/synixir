@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Page } from "@playwright/test";
 
 const document = (page: Page) => page.getByRole("textbox", { name: "Rich text document", exact: true });
@@ -15,7 +15,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `rich-text-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  const url = `${baseURL}/rich-text.html?room=${roomId}`;
+  const url = `${baseURL}/rich-text?room=${roomId}`;
   await page.goto(url);
   await saved(page);
   return { user, roomId, url };
@@ -65,7 +65,7 @@ test("rich text merges disconnected edits and restores formatted content after r
   const peer = await context.newPage();
   await peer.goto(url);
   await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await selectAll(page);
   await page.keyboard.press("ArrowLeft");
@@ -77,7 +77,7 @@ test("rich text merges disconnected edits and restores formatted content after r
   await selectAll(peer);
   await peer.getByRole("button", { name: "Bold", exact: true }).click();
   await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await saved(page);
   await expect(document(page)).toContainText("Offline: Shared sentence together.");
   await expect(document(peer)).toContainText("Offline: Shared sentence together.");
@@ -116,7 +116,8 @@ test("rich text supports lists and quotes and keeps plain text content and curso
   await expect(document(page).locator(".rich-caret")).toHaveCount(0);
   await document(page).click();
   await expect(plain.locator(".cm-ySelectionInfo")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Try the text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
+  await page.getByRole("button", { name: "Select example", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Text editor", exact: true })).toHaveJSProperty("href", `${baseURL}/?room=${roomId}`);
 });
 
 test("rich text viewer and revoked editor cannot edit, format, or undo; mobile fits", async ({ page, browser, baseURL }) => {
@@ -144,6 +145,7 @@ test("rich text viewer and revoked editor cannot edit, format, or undo; mobile f
     await expect(document(viewer)).not.toBeEditable();
     await expect(viewer.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
     await selectAll(viewer);
+    await expect(document(viewer)).toBeFocused();
     await viewer.keyboard.press("ControlOrMeta+b");
     await viewer.keyboard.press("ControlOrMeta+z");
     await viewer.keyboard.type("cannot write");

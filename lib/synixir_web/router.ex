@@ -2,7 +2,14 @@ defmodule SynixirWeb.Router do
   use SynixirWeb, :router
 
   get "/", SynixirWeb.ClientController, :index
-  get "/sdk.html", SynixirWeb.ClientController, :settings
+  get "/kanban", SynixirWeb.ClientController, :kanban
+  get "/whiteboard", SynixirWeb.ClientController, :whiteboard
+  get "/rich-text", SynixirWeb.ClientController, :rich_text
+  get "/multiplayer-form", SynixirWeb.ClientController, :multiplayer_form
+  get "/flowchart", SynixirWeb.ClientController, :flowchart
+  get "/table", SynixirWeb.ClientController, :table
+
+  # Keep previously shared example links working.
   get "/kanban.html", SynixirWeb.ClientController, :kanban
   get "/whiteboard.html", SynixirWeb.ClientController, :whiteboard
   get "/rich-text.html", SynixirWeb.ClientController, :rich_text
@@ -30,6 +37,7 @@ defmodule SynixirWeb.Router do
     post "/accounts", SessionController, :register
     get "/rooms", RoomController, :index
     post "/rooms", RoomController, :create
+    get "/rooms/:room_id", RoomController, :show
     post "/rooms/:room_id/token", RoomController, :token
     get "/rooms/:room_id/members", RoomController, :members
     put "/rooms/:room_id/members/:username", RoomController, :put_member

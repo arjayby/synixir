@@ -15,7 +15,7 @@ const failedRequests: { path: string; error?: string|undefined; status?: number;
 const password = randomBytes(24).toString("hex");
 
 type Storage = BrowserContextOptions["storageState"];
-interface Manifest { roomId: string; content: string; title: string; accounts: Record<string, { username: string; password: string; id: string; storage: Storage }> }
+interface Manifest { roomId: string; content: string; accounts: Record<string, { username: string; password: string; id: string; storage: Storage }> }
 async function context(storageState?: Storage) {
   const value = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, storageState });
   value.on("page", page => {
@@ -67,7 +67,9 @@ async function open(ctx: BrowserContext, roomId: string, role: string|RegExp|rea
     }));
     throw error;
   }
+  await page.getByRole("button", { name: `Room details: ${roomId}` }).click();
   await expect(page.locator("#role-label")).toHaveText(role);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   return page;
 }
 
@@ -132,29 +134,27 @@ try {
     await saved(first);
     for (const page of [second, third]) await text(page, content);
 
-    await second.locator("#connection").click();
+    await second.getByRole("button", { name: "Connection status", exact: true }).click();
+    await second.getByRole("alertdialog").getByRole("button", { name: "Disconnect", exact: true }).click();
     await expect(second.locator("#status")).toHaveText("Disconnected");
     await second.getByRole("textbox", { name: "Shared document" }).click();
     await second.keyboard.press("ControlOrMeta+End");
     await second.keyboard.insertText(" offline");
     await text(first, content);
-    await second.locator("#connection").click();
+    await second.getByRole("button", { name: "Connection status", exact: true }).click();
+    await second.getByRole("alertdialog").getByRole("button", { name: "Connect", exact: true }).click();
     await expect(second.locator("#status")).toHaveText("Connected");
     await saved(second);
     for (const page of [first, second, third]) await text(page, content + " offline");
     const denied = await api(viewer.ctx, `/api/rooms/${roomId}/members/${editor.username}`, "PUT", { role: "owner" });
     assert.equal(denied.status(), 403);
 
-    const settings = await owner.ctx.newPage();
-    await navigateStaging(settings, `/sdk.html?room=${roomId}`);
-    await expect(settings.locator("#sdk-state")).toHaveText("connected · saved", { timeout: 15000 });
-    await settings.locator("#sdk-title").fill("Packaged SDK settings");
-    await expect(settings.locator("#sdk-state")).toHaveText("connected · saved");
+    const example = await owner.ctx.newPage();
     // Exercise every exported route and its lazy-loaded editor bundle in the release.
     for (const route of ["kanban", "whiteboard", "rich-text", "multiplayer-form", "flowchart", "table"]) {
-      await navigateStaging(settings, `/${route}.html?room=${roomId}`);
-      await expect(settings.locator("#status")).toHaveText("Connected", { timeout: 15000 });
-      await expect(settings.locator("#editor")).toBeVisible();
+      await navigateStaging(example, `/${route}?room=${roomId}`);
+      await expect(example.locator("#status")).toHaveText("Connected", { timeout: 15000 });
+      await expect(example.locator("#editor")).toBeVisible();
     }
     assert.equal((await owner.ctx.request.get("/metrics")).status(), 404);
     const forwarded = await owner.ctx.request.get("/api/session", {
@@ -163,7 +163,7 @@ try {
     assert.equal(await rejectsOrigin("https://untrusted.example"), 403);
     assert.equal(await rejectsOrigin("https://localhost"), 403, "origin port must match");
 
-    const manifest: Manifest = { roomId, content: content + " offline", title: "Packaged SDK settings", accounts: {} };
+    const manifest: Manifest = { roomId, content: content + " offline", accounts: {} };
     for (const [role, person] of [["owner", owner], ["editor", editor], ["viewer", viewer]] as const) {
       manifest.accounts[role] = { username: person.username, password: person.password,
         id: person.user.id, storage: await person.ctx.storageState() };
@@ -193,11 +193,10 @@ try {
     const ctx = await context();
     const owner = manifest.accounts.owner;
     assert.equal((await api(ctx, "/api/session", "POST", { username: owner.username, password: owner.password })).status(), 200);
-    const settings = await ctx.newPage();
-    await navigateStaging(settings, `/sdk.html?room=${manifest.roomId}`);
-    await expect(settings.locator("#sdk-state")).toHaveText("connected · saved", { timeout: 15000 });
-    await expect(settings.locator("#sdk-title")).toHaveValue(manifest.title);
-    console.log("Pilot passed after replacement: sessions, passwords, permissions, document and SDK state retained");
+    const page = await open(ctx, manifest.roomId, "owner");
+    await text(page, manifest.content);
+    await saved(page);
+    console.log("Pilot passed after replacement: sessions, passwords, permissions and document state retained");
   } else {
     throw new Error("Expected seed or verify");
   }

@@ -1,5 +1,37 @@
 .whiteboard-surface { min-width: 0; }
 .excalidraw-shell { position: relative; width: 100%; height: 640px; min-width: 0; }
+/* Keep native drawing colors and dark-mode filtering, but match the playground controls. */
+.excalidraw-shell .excalidraw, .excalidraw-shell .excalidraw.theme--dark {
+  --island-bg-color: var(--card);
+  --input-bg-color: var(--card);
+  --input-border-color: var(--input);
+  --input-hover-bg-color: var(--muted);
+  --input-label-color: var(--foreground);
+  --popup-secondary-bg-color: var(--muted);
+  --popup-text-color: var(--foreground);
+  --popup-text-inverted-color: var(--background);
+  --color-on-surface: var(--foreground);
+  --color-surface-lowest: var(--card);
+  --color-surface-low: var(--muted);
+  --color-surface-mid: var(--muted);
+  --color-surface-high: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-darker: var(--primary);
+  --color-primary-darkest: var(--primary);
+  --color-primary-hover: var(--primary);
+  --color-primary-light: var(--accent);
+  --color-primary-light-darker: var(--accent);
+  --color-surface-primary-container: var(--accent);
+  --color-on-primary-container: var(--accent-foreground);
+  --color-brand-hover: var(--ring);
+  --color-brand-active: var(--ring);
+  --color-border-outline: var(--muted-foreground);
+  --color-border-outline-variant: var(--border);
+  --dialog-border-color: var(--border);
+  --focus-highlight-color: var(--ring);
+  --keybinding-color: var(--muted-foreground);
+  --link-color: var(--foreground);
+}
 /* The workspace Undo/Redo buttons use Yjs history and keep remote edits intact. */
 .excalidraw-shell .excalidraw .undo-redo-buttons { display: none; }
 @media (max-width: 600px) { .excalidraw-shell { height: 560px; } }

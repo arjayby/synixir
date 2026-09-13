@@ -8,9 +8,20 @@ async function setup(page: Page, baseURL: string|undefined) {
   const roomId = `sdk-${randomUUID()}`;
   const response = await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId });
   expect(response.ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/sdk.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/?room=${roomId}` };
 }
-const saved = (page: Page) => expect(page.locator("#sdk-state")).toHaveText("connected · saved");
+// Exercise the SDK through the text example without relying on a dedicated demo page.
+async function state(page: Page, saveStatus: string) {
+  await expect(page.locator("#status")).toHaveText("Connected");
+  await expect(page.locator("#save-status")).toHaveText(saveStatus);
+}
+const saved = (page: Page) => state(page, "Saved");
+async function setTitle(page: Page, title: string) {
+  await page.evaluate(value => window.synixirTest.room!.doc.getMap("sdk-test").set("title", value), title);
+}
+async function expectTitle(page: Page, title: string) {
+  await expect.poll(() => page.evaluate(() => window.synixirTest.room!.doc.getMap("sdk-test").get("title") ?? "")).toBe(title);
+}
 
 function binaryPush(message: string|number[]|Buffer<ArrayBufferLike>|[any,any,any,any,any]) {
   if (!Buffer.isBuffer(message) || message[0] !== 0) return null;
@@ -59,7 +70,7 @@ for (const replyTiming of ["before release", "after release"]) {
       });
     });
     await page.goto(url);
-    await expect(page.locator("#sdk-state")).toHaveText("connected · saving");
+    await state(page, "Saving");
     // Synchronization is ready while the durable save acknowledgement is held.
     expect(await page.evaluate(async () => window.synixirTest.room!.state.saveStatus)).toBe("saving");
     const reply = JSON.parse(await replyArrived.promise);
@@ -75,19 +86,19 @@ for (const replyTiming of ["before release", "after release"]) {
     const peer = await context.newPage();
     await peer.goto(url);
     await saved(peer);
-    await page.getByLabel("Room title").fill("Shared settings");
-    await expect(peer.getByLabel("Room title")).toHaveValue("Shared settings");
+    await setTitle(page, "Shared value");
+    await expectTitle(peer, "Shared value");
     await saved(page);
   });
 }
 
-test("fresh grants recover a bare SDK after a crash and overlapping disconnect/connect", async ({ page, context, baseURL, backend }) => {
+test("fresh grants recover the SDK after a crash and overlapping disconnect/connect", async ({ page, context, baseURL, backend }) => {
   let grants = 0;
   await page.route("**/api/rooms/*/token", async route => { grants++; await route.continue(); });
   const { url } = await setup(page, baseURL);
   await page.goto(url);
   await saved(page);
-  await page.getByLabel("Room title").fill("Before crash");
+  await setTitle(page, "Before crash");
   await saved(page);
   const beforeRestart = grants;
   await backend.restart();
@@ -96,7 +107,7 @@ test("fresh grants recover a bare SDK after a crash and overlapping disconnect/c
   const result = await page.evaluate(async () => {
     const room = window.synixirTest.room!;
     const closing = room.disconnect();
-    room.doc.getMap("settings").set("title", "Retained offline edit");
+    room.doc.getMap("sdk-test").set("title", "Retained offline edit");
     const first = room.connect();
     const same = first === room.connect();
     await Promise.all([closing, first]);
@@ -107,7 +118,7 @@ test("fresh grants recover a bare SDK after a crash and overlapping disconnect/c
   const peer = await context.newPage();
   await peer.goto(url);
   await saved(peer);
-  await expect(peer.getByLabel("Room title")).toHaveValue("Retained offline edit");
+  await expectTitle(peer, "Retained offline edit");
   const beforeDestroy = grants;
   const final = await page.evaluate(async () => {
     const room = window.synixirTest.room!;
@@ -142,10 +153,10 @@ test("viewer transport suppresses programmatic document writes while keeping awa
     await page.goto(url);
     await saved(page);
     await viewer.goto(url);
-    await expect(viewer.locator("#sdk-state")).toHaveText("connected · view-only");
+    await state(viewer, "View only");
     await viewer.evaluate(async () => {
       const room = window.synixirTest.room!;
-      room.doc.getMap("settings").set("title", "local viewer mutation");
+      room.doc.getMap("sdk-test").set("title", "local viewer mutation");
       room.awareness.setLocalStateField("page", "viewer-presence");
     });
     await expect.poll(() => page.evaluate(async () => [...window.synixirTest.room!.awareness.getStates().values()]
@@ -155,10 +166,10 @@ test("viewer transport suppresses programmatic document writes while keeping awa
       await room.disconnect();
       await room.connect();
     });
-    await expect(viewer.locator("#sdk-state")).toHaveText("connected · view-only");
+    await state(viewer, "View only");
     expect(writes).toEqual([]);
     await page.reload();
     await saved(page);
-    await expect(page.getByLabel("Room title")).toHaveValue("");
+    await expectTitle(page, "");
   } finally { await viewerContext.close(); }
 });

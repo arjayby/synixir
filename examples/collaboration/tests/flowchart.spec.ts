@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Locator, Page } from "@playwright/test";
 
 async function setup(page: Page, baseURL: string|undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `flowchart-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/flowchart.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/flowchart?room=${roomId}` };
 }
 const saved = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
 const node = (page: Page, name: string) => page.getByRole("group", { name, exact: true });
@@ -96,19 +96,20 @@ test("flowchart merges offline edits, restores nodes and arrows after restart, a
   await add(page, "process", "Draft"); await add(page, "terminal", "Done");
   await connect(page, "Process: Draft", "Done", "Review");
   const peer = await context.newPage(); await peer.goto(url); await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await node(page, "Process: Draft").click(); await page.keyboard.press("Shift+ArrowRight");
   const moved = await position(node(page, "Process: Draft"));
   await peer.getByRole("button", { name: "Draft → Done · Review", exact: true }).click();
   await peer.getByLabel("Connection label", { exact: true }).fill("Approved"); await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click(); await saved(page);
+  await changeConnection(page, "Connect"); await saved(page);
   await expect(page.locator(".flow-edge-label")).toHaveText("Approved");
   await page.close(); await peer.close(); await backend.restart();
   const fresh = await context.newPage(); await fresh.goto(url); await saved(fresh);
   await expect.poll(() => position(node(fresh, "Process: Draft"))).toEqual(moved);
   await expect(fresh.locator(".flow-edge-label")).toHaveText("Approved");
-  await fresh.getByRole("link", { name: "Try the whiteboard", exact: true }).click();
-  await expect(fresh).toHaveURL(`${baseURL}/whiteboard.html?room=${roomId}`); await saved(fresh);
+  await fresh.getByRole("button", { name: "Select example", exact: true }).click();
+  await fresh.getByRole("menuitem", { name: "Whiteboard", exact: true }).click();
+  await expect(fresh).toHaveURL(`${baseURL}/whiteboard?room=${roomId}`); await saved(fresh);
   await expect(fresh.locator(".whiteboard-object")).toHaveCount(0);
 });
 

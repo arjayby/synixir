@@ -8,6 +8,7 @@ import type { Collaborator, ExcalidrawImperativeAPI, ExcalidrawProps, SocketId }
 import type { SynixirRoom } from "@synixir/client";
 import { createWhiteboardModel, sameScene } from "./model.ts";
 import { createCursorMotion } from "../lib/cursor-motion.ts";
+import { getTheme, subscribeTheme } from "../lib/theme.ts";
 
 declare global { interface Window { synixirWhiteboardTest?: ExcalidrawImperativeAPI } }
 const cloneScene = (scene: readonly ExcalidrawElement[]): ExcalidrawElement[] => JSON.parse(JSON.stringify(scene));
@@ -173,13 +174,14 @@ export function createWhiteboard(room: SynixirRoom) {
       if (!disposed && !value.getAppState().isLoading) { initialized = true; paint(); collaborators(); }
     });
   };
+  // Excalidraw adapts this scene color for dark mode without changing the drawing.
   const initialData = { elements: [], appState: { currentItemFontFamily: 2, viewBackgroundColor: "#ffffff" } };
   const uiOptions = { tools: { image: false }, canvasActions: {
-    loadScene: false, saveToActiveFile: false, changeViewBackgroundColor: false,
+    loadScene: false, saveToActiveFile: false, changeViewBackgroundColor: false, toggleTheme: false,
   } };
   function render() {
     root.render(<div className="excalidraw-shell" aria-label="Whiteboard canvas">
-      <Excalidraw excalidrawAPI={ready} initialData={initialData} onChange={onChange}
+      <Excalidraw excalidrawAPI={ready} initialData={initialData} onChange={onChange} theme={getTheme()}
         onPointerUpdate={onPointerUpdate} onPointerDown={() => model.beginGesture()}
         onPointerUp={() => model.endGesture()} viewModeEnabled={readOnly} isCollaborating
         UIOptions={uiOptions} aiEnabled={false} validateEmbeddable={false}
@@ -219,6 +221,7 @@ export function createWhiteboard(room: SynixirRoom) {
   document.addEventListener("visibilitychange", () => { if (document.hidden) clearPointer(); }, { signal: events.signal });
   for (const event of ["stack-item-added", "stack-item-popped", "stack-cleared"] as const)
     model.history.on(event, historyState);
+  const stopTheme = subscribeTheme(render);
   render();
 
   function destroy() {
@@ -226,7 +229,7 @@ export function createWhiteboard(room: SynixirRoom) {
     clearTimeout(presenceTimer);
     cursorMotion.destroy();
     if (pendingFrame !== undefined) cancelAnimationFrame(pendingFrame);
-    stopModel(); stopState();
+    stopModel(); stopState(); stopTheme();
     room.awareness.off("change", collaborators);
     room.awareness.setLocalStateField("whiteboard", null);
     events.abort();

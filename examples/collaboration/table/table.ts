@@ -6,7 +6,6 @@ import { TableSession } from "./session.ts";
 
 export function createCollaborativeTable(room: SynixirRoom) {
   const host = document.querySelector<HTMLElement>("#editor")!;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = location.href;
   const session = new TableSession(room);
   const root = createRoot(host);
   root.render(createElement(CollaborativeTable, { session }));

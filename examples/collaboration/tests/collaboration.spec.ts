@@ -1,4 +1,4 @@
-import { openRoom } from "./access-helpers.ts";
+import { changeConnection, openRoom } from "./access-helpers.ts";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
 
@@ -96,14 +96,14 @@ test("awareness shows participants and selections and removes them on departure"
     await insertAtStart(bob, "Before ");
     await expectText(alice, "Before Hello everyone");
     await expect(bob.locator(".cm-ySelection")).toHaveText("Hello");
-    await alice.getByLabel("Room ID", { exact: true }).focus();
+    await alice.getByRole("button", { name: "Select example", exact: true }).focus();
     await expect(bob.locator(".cm-ySelectionCaret")).toHaveCount(0);
 
-    await alice.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await changeConnection(alice, "Disconnect");
     await expect(bob.locator("#participant-count")).toHaveText("1 online");
     await expect(alice.locator("#participant-count")).toHaveText("Offline");
     await expect(alice.locator("#participants li")).toHaveCount(1);
-    await alice.getByRole("button", { name: "Connect", exact: true }).click();
+    await changeConnection(alice, "Connect");
     await connected(alice);
     await expect(bob.locator("#participant-count")).toHaveText("2 online");
     await backend.restart();
@@ -123,9 +123,10 @@ test("offline edits prompt before leaving and survive cancelling room navigation
   const room = `leave-${randomUUID()}`;
   await openRoom(page, `${baseURL}/?room=${room}`);
   await connected(page);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await insertAtStart(page, "Keep this draft");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
+  await page.getByRole("button", { name: `Room details: ${room}` }).click();
   await page.getByLabel("Room ID", { exact: true }).fill(`other-${randomUUID()}`);
   const dialogPromise = page.waitForEvent("dialog");
   await page.getByRole("button", { name: "Open room", exact: true }).click({ noWaitAfter: true });
@@ -133,8 +134,9 @@ test("offline edits prompt before leaving and survive cancelling room navigation
   expect(dialog.type()).toBe("beforeunload");
   await dialog.dismiss();
   await expect(page).toHaveURL(`${baseURL}/?room=${room}`);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await expectText(page, "Keep this draft");
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await expect(page.locator("#save-status")).toHaveText("Saved");
 });
 
@@ -160,7 +162,7 @@ test("independent clients merge concurrent text edits through Phoenix and Yex", 
     // Both edits start from the same document state before either client sees
     // the other's change. Reconnection must merge them without losing text.
     for (const page of [alice, bob]) {
-      await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+      await changeConnection(page, "Disconnect");
       await expect(page.locator("#status")).toHaveText("Disconnected");
     }
     await insertAtStart(alice, "A ");
@@ -169,7 +171,7 @@ test("independent clients merge concurrent text edits through Phoenix and Yex", 
     await expectText(bob, "B Hello 👋");
 
     for (const page of [alice, bob]) {
-      await page.getByRole("button", { name: "Connect", exact: true }).click();
+      await changeConnection(page, "Connect");
       await expect(page.locator("#status")).toHaveText("Connected");
     }
     await expectText(alice, /^(A B |B A )Hello 👋$/);
@@ -224,11 +226,11 @@ test("saved inserts and deletions survive a killed server without help from old 
     await openRoom(reader, roomUrl);
     await expect(reader.locator("#status")).toHaveText("Connected");
     await expectText(reader, "Saved after restart");
-    await reader.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await changeConnection(reader, "Disconnect");
     await insertAtStart(reader, "Offline ");
     await expect(reader.locator("#save-status")).toHaveText("Unsaved changes");
     await backend.restart();
-    await reader.getByRole("button", { name: "Connect", exact: true }).click();
+    await changeConnection(reader, "Connect");
     await expect(reader.locator("#status")).toHaveText("Connected");
     await expect(reader.locator("#save-status")).toHaveText("Saved");
   } finally {

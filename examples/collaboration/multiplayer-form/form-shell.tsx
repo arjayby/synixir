@@ -34,7 +34,7 @@ function FormShell({ state }: { state: ShellState }) {
   return <Fragment>
     <form className="shared-form" noValidate>
       <div className="brief-heading">
-        <div><p className="eyebrow">PROJECT BRIEF</p><h2>Let&apos;s get on the same page.</h2><p className="note">A shared starting point for your next project.</p></div>
+        <div><p className="eyebrow">FORM</p><h2>Let&apos;s get on the same page.</h2><p className="note">A shared starting point for your next project.</p></div>
         <span id="brief-completion">0 of 4 complete</span>
       </div>
       <progress id="brief-progress" defaultValue={0} max={4} aria-label="Required fields completed" />

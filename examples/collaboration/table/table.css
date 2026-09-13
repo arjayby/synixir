@@ -10,8 +10,9 @@
   --rdg-background-color: var(--card);
   --rdg-header-background-color: var(--muted);
   --rdg-border-color: var(--border);
-  --rdg-row-hover-background-color: var(--accent);
-  --rdg-row-selected-background-color: var(--accent);
+  --rdg-row-hover-background-color: var(--muted);
+  --rdg-row-selected-background-color: color-mix(in srgb, var(--ring) 15%, var(--card));
+  --rdg-row-selected-hover-background-color: color-mix(in srgb, var(--ring) 25%, var(--card));
   --rdg-selection-color: var(--primary);
   --rdg-font-size: 14px;
   border: 0;

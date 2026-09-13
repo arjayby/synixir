@@ -4,7 +4,6 @@ import { mountBoardView } from "./board-view.tsx";
 
 export function createBoard(room: SynixirRoom) {
   const root = document.querySelector<HTMLElement>("#editor")!;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const model = createBoardModel(room.doc);
   const events = new AbortController();
   const listen = <K extends keyof DocumentEventMap>(target: EventTarget, event: K, handler: (event: DocumentEventMap[K]) => void, capture = false) => target.addEventListener(event, handler as EventListener, { signal: events.signal, capture });
@@ -82,7 +81,7 @@ export function createBoard(room: SynixirRoom) {
     publish();
     const opener = [...root.querySelectorAll<HTMLElement>(".kanban-card")]
       .find(node => node.dataset.cardId === returnFocusId)?.querySelector<HTMLElement>(".card-open")!;
-    const fallback = !undo.disabled ? undo : root.querySelector<HTMLElement>(".add-card:not(:disabled)")! ?? document.querySelector<HTMLButtonElement>("#connection")!;
+    const fallback = !undo.disabled ? undo : root.querySelector<HTMLElement>(".add-card:not(:disabled)")! ?? document.querySelector<HTMLButtonElement>('button[aria-label="Connection status"]')!;
     (opener ?? fallback).focus();
     returnFocusId = null;
   });

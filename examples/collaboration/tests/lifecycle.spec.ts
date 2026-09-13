@@ -1,4 +1,4 @@
-import { openRoom } from "./access-helpers.ts";
+import { changeConnection, openRoom } from "./access-helpers.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
 import { connected, editor } from "./editor-helpers.ts";
@@ -58,10 +58,10 @@ test("a document larger than one message survives offline edits, compaction and 
   await page.keyboard.insertText(content);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await expectDocument(peer, content);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await edit(page, [{ from: 0, to: 1000 }, { from: content.length, insert: " offline👋" }]);
   await edit(peer, { from: 0, insert: "peer:" });
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   const expected = `peer:${content.slice(1000)} offline👋`;
@@ -100,14 +100,14 @@ test("an interrupted chunk upload is never saved and reconnect retries the retai
   await editor(page).click();
   await page.keyboard.insertText(content);
   await expect(page.locator("#status")).toHaveText("Reconnecting");
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#save-status")).not.toHaveText("Saved");
   const reader = await context.newPage();
   await openRoom(reader, url);
   await connected(reader);
   await expectDocument(reader, "");
   interrupt = false;
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await expectDocument(reader, content);
@@ -145,13 +145,13 @@ test("a missing final chunk acknowledgement stays unconfirmed and stale replies 
   await page.keyboard.insertText(content);
   await expect(page.locator("#save-status")).toHaveText("Saving");
   await expect(page.locator("#save-status")).toHaveText("Save failed", { timeout: 15_000 });
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await edit(page, { from: content.length, insert: "new generation" });
   hold = false;
   // Deliver the old success while offline: it cannot confirm the new edit.
   for (const sendHeld of release) sendHeld();
   await expect(page.locator("#save-status")).not.toHaveText("Saved");
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await page.reload();

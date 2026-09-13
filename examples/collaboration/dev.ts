@@ -18,7 +18,7 @@ await app.prepare();
 const handle = app.getRequestHandler();
 const server = createServer((request, response) => {
   if (/^\/(api|socket)(\/|\?|$)/.test(request.url ?? "")) return proxy.web(request, response);
-  // Keep the published example URLs working in development and static exports.
+  // Keep previously shared .html links working in development.
   request.url = request.url?.replace(/^([^?]*)\.html(?=\?|$)/, "$1");
   void handle(request, response);
 });

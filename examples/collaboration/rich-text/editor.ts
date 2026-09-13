@@ -61,7 +61,6 @@ export function createRichText(room: SynixirRoom) {
         <div class="actions"><button type="button" id="remove-link" class="subtle">Remove link</button><button type="button" id="cancel-link" class="subtle">Cancel</button><button type="submit">Apply link</button></div>
       </form>
     </dialog>`;
-  document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const toolbar = root.querySelector<HTMLElement>(".format-toolbar")!;
   const style = root.querySelector<HTMLSelectElement>("#text-style")!;
   const dialog = root.querySelector<HTMLDialogElement>("dialog")!;
@@ -107,6 +106,8 @@ export function createRichText(room: SynixirRoom) {
     ],
     editorProps: { attributes: {
       "aria-label": "Rich text document", "aria-describedby": "editor-help", "aria-multiline": "true", role: "textbox", spellcheck: "true",
+      // Keep key events inside the editor when it becomes read-only.
+      tabindex: "0",
     } },
   });
 

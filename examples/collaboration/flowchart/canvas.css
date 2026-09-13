@@ -20,15 +20,37 @@
 .flowchart-editor [data-slot="native-select"] { padding: 4px 32px 4px 10px; font-size: 13px; line-height: 20px; }
 .flowchart-editor .inspector-fields textarea { border: 1px solid var(--input); border-radius: 6px; padding: 10px; line-height: 1.5; resize: vertical; }
 .flowchart-editor #whiteboard-viewport { position: relative; width: 100%; min-width: 0; height: 520px; overflow: hidden; overscroll-behavior: contain; background: var(--background); }
-.flowchart-editor .react-flow { width: 100%; height: 100%; --xy-background-color: var(--background); --xy-node-color: var(--foreground); --xy-edge-stroke: var(--muted-foreground); --xy-edge-stroke-selected: var(--primary); --xy-controls-button-background-color: var(--card); --xy-controls-button-background-color-hover: var(--muted); --xy-controls-button-color: var(--foreground); --xy-controls-button-border-color: var(--border); --xy-minimap-background-color: var(--card); --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 65%, transparent); }
-.flowchart-editor .flow-node { padding: 0; background: transparent; border: 0; font-size: 17px; color: #223e33; }
+.flowchart-editor .react-flow {
+  width: 100%;
+  height: 100%;
+  --xy-background-color: var(--background);
+  --xy-background-pattern-dots-color: var(--border);
+  --xy-connectionline-stroke: var(--muted-foreground);
+  --xy-resize-background-color: var(--ring);
+  --xy-minimap-node-background-color: var(--muted-foreground);
+  --xy-minimap-node-stroke-color: var(--border);
+  --xy-node-color: var(--foreground);
+  --xy-edge-stroke: var(--muted-foreground);
+  --xy-edge-stroke-selected: var(--primary);
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--muted);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 65%, transparent);
+}
+.flowchart-editor .flow-node { padding: 0; background: transparent; border: 0; font-size: 17px; color: var(--foreground); }
 .flowchart-editor .flow-node.selected, .flowchart-editor .flow-node:focus-visible { outline: 2px solid var(--ring); outline-offset: 5px; }
-.flow-shape { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; border: 1.5px solid #819b8d; border-radius: 10px; background: var(--flow-node-fill); box-shadow: 0 3px 8px #28332c12; }
+.flow-shape { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; border: 1.5px solid color-mix(in srgb, var(--foreground) 35%, var(--flow-node-fill)); border-radius: 10px; background: var(--flow-node-fill); box-shadow: 0 3px 8px #00000012; }
 .flowchart-editor .color-blue { --flow-node-fill: #d6e7ff; }
 .flowchart-editor .color-yellow { --flow-node-fill: #fff0a4; }
 .flowchart-editor .color-mint { --flow-node-fill: #d5eedd; }
 .flowchart-editor .color-rose { --flow-node-fill: #f9dbe3; }
-.flowchart-editor .color-white { --flow-node-fill: #fff; }
+.flowchart-editor .color-white { --flow-node-fill: var(--card); }
+.dark .flowchart-editor .color-blue { --flow-node-fill: #263b56; }
+.dark .flowchart-editor .color-yellow { --flow-node-fill: #483e22; }
+.dark .flowchart-editor .color-mint { --flow-node-fill: #283f33; }
+.dark .flowchart-editor .color-rose { --flow-node-fill: #4b2f3b; }
 .flow-shape-terminal { border-radius: 999px; }
 .flow-shape-decision { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border-radius: 0; padding: 30px 45px; }
 .flow-shape > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; text-align: center; line-height: 1.45; }
@@ -36,7 +58,7 @@
 .flowchart-editor .react-flow__resize-control.handle { width: 9px; height: 9px; border-radius: 2px; }
 .flowchart-editor .react-flow__controls-button { display: flex; justify-content: center; align-items: center; width: 30px; height: 30px; padding: 7px; border-radius: 0; color: var(--foreground); background: var(--card); }
 .flowchart-editor .react-flow__controls-button:hover { background: var(--muted); }
-.flowchart-editor .react-flow__controls-button svg { width: 16px; height: 16px; }
+.flowchart-editor .react-flow__controls-button svg { fill: currentColor; width: 16px; height: 16px; }
 .flowchart-editor .flow-edge { fill: none; stroke: var(--muted-foreground); stroke-width: 2; }
 .flowchart-editor .flow-edge.is-selected { stroke: var(--primary); stroke-width: 3; }
 .flowchart-editor .flow-edge-label { font: 13px system-ui, sans-serif; fill: var(--foreground); text-anchor: middle; paint-order: stroke; stroke: var(--background); stroke-width: 6; stroke-linejoin: round; cursor: pointer; }

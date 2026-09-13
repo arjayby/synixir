@@ -1,4 +1,4 @@
-import { openRoom } from "./access-helpers.ts";
+import { changeConnection, openRoom } from "./access-helpers.ts";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
 import { editor, expectText, insertAtStart, connected } from "./editor-helpers.ts";
@@ -55,9 +55,9 @@ test("missing save acknowledgements never show Saved and reconnect confirms the 
   // A late acknowledgement after the request timed out cannot confirm it.
   releaseReplies();
   await expect(page.locator("#save-status")).toHaveText("Save failed");
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   holdReplies = false;
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await page.reload();
@@ -87,12 +87,14 @@ test("reconnect fetches fresh access and rejected joins retain local edits", asy
   });
   await openRoom(page, `${baseURL}/?room=access-retry-${randomUUID()}`);
   await expect(page.locator("#status")).toHaveText("Access expired or denied");
+  await page.getByRole("button", { name: "Connection status", exact: true }).click();
   await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Close", exact: true }).click();
   await insertAtStart(page, "Keep my local draft");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
   expect(requests).toBe(1);
   reject = false;
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   expect(requests).toBe(2);
@@ -103,7 +105,7 @@ test("reconnect fetches fresh access and rejected joins retain local edits", asy
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
   expect(requests).toBe(3);
   reject = false;
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await page.reload();

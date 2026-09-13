@@ -157,19 +157,32 @@ defmodule Synixir.RoomAccess do
     end)
   end
 
+  def info(room, hash) do
+    with_member(room, hash, "FOR SHARE", fn _id, member, _expires ->
+      %{
+        id: room,
+        role: member.role,
+        members: Enum.map(member_roster(room), &Map.take(&1, [:username, :role]))
+      }
+    end)
+  end
+
   def members(room, hash) do
     with_member(room, hash, "FOR SHARE", fn _id, member, _expires ->
       if member.role != "owner", do: Repo.rollback(:forbidden)
-
-      Repo.all(
-        from m in "room_memberships",
-          join: u in User,
-          on: u.id == m.user_id,
-          where: m.room_id == ^room and is_nil(m.revoked_at),
-          order_by: u.username,
-          select: %{user_id: u.id, username: u.username, role: m.role}
-      )
+      member_roster(room)
     end)
+  end
+
+  defp member_roster(room) do
+    Repo.all(
+      from m in "room_memberships",
+        join: u in User,
+        on: u.id == m.user_id,
+        where: m.room_id == ^room and is_nil(m.revoked_at),
+        order_by: u.username,
+        select: %{user_id: u.id, username: u.username, role: m.role}
+    )
   end
 
   def set_member(room, hash, username, role) when role in @roles or is_nil(role) do

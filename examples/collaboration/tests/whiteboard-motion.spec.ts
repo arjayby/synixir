@@ -1,3 +1,4 @@
+import { changeConnection } from "./access-helpers.ts";
 import { test, expect } from "./fixtures.ts";
 import { canvas, drawShape, elementPoint, savedWhiteboard as saved, scene, selectShape, setupWhiteboard as setup } from "./whiteboard-helpers.ts";
 
@@ -36,7 +37,7 @@ for (const reducedMotion of [false, true]) test(`Excalidraw cursor motion leaves
   expect(await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(docBefore);
   await page.mouse.move(box!.x + 250, box!.y - 20);
   await expect.poll(remotePointer).toBeUndefined();
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect.poll(() => peer.evaluate(() => window.synixirWhiteboardTest!.getAppState().collaborators.size)).toBe(0);
   await expect(peer.locator("#participants li")).toHaveCount(1);
 });

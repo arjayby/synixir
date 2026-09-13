@@ -145,7 +145,7 @@ export function CollaborativeTable({ session }: { session: TableSession }) {
       <Button id="add-column" variant="outline" onClick={() => add("columns")} disabled={readOnly || columns.length >= limits.columns}>+ Add column</Button>
     </div><span id="table-count" role="status">{rows.length} rows · {columns.length} columns</span></div>
     <div className="table-selection-bar"><output id="cell-address" aria-label="Selected cell">{selection ? session.address(selection.row, selection.column) : "Select a cell"}</output><span id="table-hint">Enter or double-click to edit · Drag a header edge to resize · Paste from a spreadsheet</span></div>
-    <DataGrid ref={value => { session.grid = value; }} className="shared-table rdg-light" aria-label="Shared planning table" aria-describedby="table-hint"
+    <DataGrid ref={value => { session.grid = value; }} className="shared-table" aria-label="Shared planning table" aria-describedby="table-hint"
       columns={gridColumns} rows={rows} rowKeyGetter={rowKeyGetter} rowHeight={68} headerRowHeight={46}
       style={{ height: Math.min(500, Math.max(256, 47 + rows.length * 68 + 16)) }}
       onActivePositionChange={({ row, column }) => session.select(row && column && column.key !== "row-number" ? { row: row.id, column: column.key } : null)}

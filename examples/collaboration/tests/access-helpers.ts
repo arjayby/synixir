@@ -4,6 +4,13 @@ import { randomUUID } from "node:crypto";
 export const password = "a browser test password of sufficient length";
 const rooms = new Map();
 
+export async function changeConnection(page: Page, action: "Connect" | "Disconnect" | "Reload") {
+  await page.getByRole("button", { name: "Connection status", exact: true }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Connection status", exact: true });
+  await dialog.getByRole("button", { name: action, exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 export async function api(context: APIRequestContext, baseURL: string|undefined, path: string, method = "GET", data?: { username?: string; password?: string; room_id?: string|null; role?: any; }) {
   const bootstrap = await context.get(`${baseURL}/api/session`);
   const session = await bootstrap.json();

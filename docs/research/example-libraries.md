@@ -58,10 +58,6 @@ The local table currently binds each cell to its own Y.Text and CodeMirror insta
 
 For this small form, I would add Zod only when the schema needs to grow, and add React Hook Form when touched/error/submission state warrants it. These packages do not establish the synchronization contract. Keep Yjs as shared state, preserve the Y.Text editor bindings, and bridge local field updates and remote observations without resetting another user's active text. This recommendation follows the local [form model](../../examples/collaboration/multiplayer-form/model.ts) and [form UI](../../examples/collaboration/multiplayer-form/form.ts).
 
-## Shared settings
-
-Keep the minimal React controls with `@synixir/client` and Yjs. This route exists to demonstrate the SDK; an additional state-management package would obscure that example. Local sources: [example descriptions](../../examples/collaboration/lib/examples.ts), [workspace implementation](../../examples/collaboration/components/workspace/workspace.tsx).
-
 ## Scope of the findings
 
 These recommendations combine official documentation, published package metadata, and the current source code. No replacement package was installed or tested in the application. UI packages would still use Synixir for room access, transport, durable saves, and reconnection; integration work must preserve those behaviors.
