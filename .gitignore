@@ -39,3 +39,6 @@ __pycache__/
 /examples/collaboration/out/
 *.tsbuildinfo
 /examples/collaboration/next-env.d.ts
+
+# Fonts copied from the installed Excalidraw package before dev/build.
+/examples/collaboration/public/excalidraw-assets/

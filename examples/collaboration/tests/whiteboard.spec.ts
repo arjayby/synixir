@@ -1,154 +1,116 @@
-import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
 import { api, register } from "./access-helpers.ts";
-import { Locator, Page } from "@playwright/test";
+import { canvas, drawShape, elementPoint, savedWhiteboard as saved, scene, selectShape, setupWhiteboard as setup } from "./whiteboard-helpers.ts";
 
-async function setup(page: Page, baseURL: string|undefined) {
-  const user = await register(page.request, baseURL);
-  const roomId = `whiteboard-${randomUUID()}`;
-  expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/whiteboard.html?room=${roomId}` };
-}
-const saved = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
-const note = (page: Page, text: string) => page.getByRole("button", { name: `Sticky note: ${text}`, exact: true });
-const position = (locator: Locator) => locator.evaluate((node: Element) => {
-  const transform = new DOMMatrixReadOnly(getComputedStyle(node).transform);
-  return { x: transform.m41, y: transform.m42 };
-});
-async function addNote(page: Page, text: string) {
-  await page.getByRole("button", { name: "+ Sticky note", exact: true }).click();
-  await page.getByLabel("Object text").fill(text);
-  await saved(page);
-}
+test.setTimeout(90_000);
 
-test("whiteboard syncs objects, live drag previews, cursors, selections, and local undo", async ({ page, context, baseURL }) => {
+test("Excalidraw syncs shapes, live dragging, presence, and local undo", async ({ page, context, baseURL }) => {
   const { user, url } = await setup(page, baseURL);
-  await page.goto(url);
-  await saved(page);
-  const peer = await context.newPage();
-  await peer.goto(url);
-  await saved(peer);
-  await addNote(page, "Launch ideas");
-  await expect(note(peer, "Launch ideas")).toBeVisible();
-  await note(peer, "Launch ideas").click();
-  await peer.getByLabel("Object color").selectOption("mint");
-  await expect(note(page, "Launch ideas")).toHaveClass(/color-mint/);
-  await expect(page.locator(".remote-selection")).toContainText(user.username);
-  await note(page, "Launch ideas").scrollIntoViewIfNeeded();
-  const before = await position(note(page, "Launch ideas"));
-  const box = await note(page, "Launch ideas").boundingBox();
-  if (!box) throw new Error("Expected a visible element");
-  await page.mouse.move(box.x + 50, box.y + 50);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 140, box.y + 100, { steps: 8 });
-  await expect.poll(() => position(note(peer, "Launch ideas"))).toEqual({ x: before.x + 90, y: before.y + 50 });
-  await expect(peer.locator(".remote-cursor")).toContainText(user.username);
-  await page.mouse.up();
-  await saved(page);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect.poll(() => position(note(peer, "Launch ideas"))).toEqual(before);
-  await expect(note(page, "Launch ideas")).toHaveClass(/color-mint/);
-  await page.getByRole("button", { name: "Redo", exact: true }).click();
-  await expect.poll(() => position(note(peer, "Launch ideas"))).toEqual({ x: before.x + 90, y: before.y + 50 });
+  await page.goto(url); await saved(page);
+  const peer = await context.newPage(); await peer.goto(url); await saved(peer);
+  const element = await drawShape(page);
+  await expect.poll(async () => (await scene(peer)).length).toBe(1);
+  await selectShape(peer, element.id);
+  await peer.getByTestId("strokeWidth-bold").locator("..").click();
+  await expect.poll(async () => (await scene(page))[0].strokeWidth).toBe(2);
+  await expect.poll(() => page.evaluate(() => [...window.synixirWhiteboardTest!.getAppState().collaborators.values()]
+    .map(peer => peer.username))).toContain(user.username);
+  await selectShape(page, element.id);
+  const point = await elementPoint(page, element.id);
+  await page.mouse.move(point.x - element.width / 2, point.y); await page.mouse.down();
+  await page.mouse.move(point.x - element.width / 2 + 90, point.y + 50, { steps: 8 });
+  await expect.poll(async () => (await scene(peer))[0].x).toBeCloseTo(element.x + 90, 0);
+  await page.mouse.up(); await saved(page);
+  await page.locator("#undo").click();
+  await expect.poll(async () => (await scene(peer))[0].x).toBeCloseTo(element.x, 0);
+  expect((await scene(page))[0].strokeWidth).toBe(2);
+  await page.locator("#redo").click();
+  await expect.poll(async () => (await scene(peer))[0].x).toBeCloseTo(element.x + 90, 0);
+  await page.screenshot({ path: "/tmp/synixir-whiteboard-desktop.png", fullPage: true });
 });
 
-test("whiteboard cancels a drag, supports keyboard movement at zoom, resizing and deletion", async ({ page, baseURL }) => {
+test("Excalidraw supports native text, zoom, keyboard movement, resizing, and deletion", async ({ page, baseURL }) => {
   const { url } = await setup(page, baseURL);
-  await page.goto(url);
-  await saved(page);
-  await addNote(page, "Keep this idea");
-  await page.getByLabel("Zoom out", { exact: true }).click();
-  await note(page, "Keep this idea").scrollIntoViewIfNeeded();
-  const before = await position(note(page, "Keep this idea"));
-  const box = await note(page, "Keep this idea").boundingBox();
-  if (!box) throw new Error("Expected a visible element");
-  await page.mouse.move(box.x + 30, box.y + 30);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 90, box.y + 75, { steps: 5 });
+  await page.goto(url); await saved(page);
+  const element = await drawShape(page);
+  await page.getByTestId("toolbar-text").locator("..").click();
+  const box = await canvas(page).boundingBox();
+  await page.mouse.click(box!.x + 280, box!.y + 350);
+  await page.keyboard.type("Keep this idea");
   await page.keyboard.press("Escape");
-  await page.mouse.up();
-  await expect.poll(() => position(note(page, "Keep this idea"))).toEqual(before);
-  await note(page, "Keep this idea").click();
+  await expect.poll(async () => (await scene(page)).find(e => e.type === "text")?.text).toBe("Keep this idea");
+  await selectShape(page, element.id);
   await page.keyboard.press("Shift+ArrowRight");
-  await expect.poll(() => position(note(page, "Keep this idea"))).toEqual({ x: before.x + 10, y: before.y });
-  await page.getByLabel("Width", { exact: true }).fill("300");
-  await page.getByLabel("Width", { exact: true }).press("Tab");
-  await expect(note(page, "Keep this idea")).toHaveCSS("width", "300px");
-  await page.getByRole("button", { name: "Delete object", exact: true }).click();
-  await expect(page.locator(".whiteboard-object")).toHaveCount(0);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(note(page, "Keep this idea")).toBeVisible();
+  await expect.poll(async () => (await scene(page)).find(e => e.id === element.id)?.x).toBe(element.x + 5);
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.synixirWhiteboardTest!.getAppState().zoom.value)).toBeLessThan(1);
+  await selectShape(page, element.id);
+  const state = await page.evaluate(id => {
+    const api = window.synixirWhiteboardTest!, e = api.getSceneElements().find(e => e.id === id)!, s = api.getAppState();
+    return { x: (e.x + e.width + s.scrollX) * s.zoom.value + s.offsetLeft,
+      y: (e.y + e.height + s.scrollY) * s.zoom.value + s.offsetTop, width: e.width };
+  }, element.id);
+  await page.mouse.move(state.x + 4, state.y + 4); await page.mouse.down();
+  await page.mouse.move(state.x + 50, state.y + 35, { steps: 5 }); await page.mouse.up();
+  await expect.poll(async () => (await scene(page)).find(e => e.id === element.id)?.width ?? 0).toBeGreaterThan(state.width);
+  await page.keyboard.press("Delete");
+  await expect.poll(async () => (await scene(page)).some(e => e.id === element.id)).toBe(false);
+  await page.locator("#undo").click();
+  await expect.poll(async () => (await scene(page)).some(e => e.id === element.id)).toBe(true);
 });
 
-test("whiteboard merges offline edits and restores saved shapes after a crash", async ({ page, context, baseURL, backend }) => {
+test("Excalidraw merges offline edits and restores saved scenes after a backend crash", async ({ page, context, baseURL, backend }) => {
   const { url } = await setup(page, baseURL);
-  await page.goto(url);
-  await saved(page);
-  await addNote(page, "Offline idea");
-  const peer = await context.newPage();
-  await peer.goto(url);
-  await saved(peer);
+  await page.goto(url); await saved(page);
+  const element = await drawShape(page);
+  const peer = await context.newPage(); await peer.goto(url); await saved(peer);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(page.locator("#status")).toHaveText("Disconnected");
-  await note(page, "Offline idea").click();
-  const beforeMove = await position(note(page, "Offline idea"));
-  await page.keyboard.press("Shift+ArrowRight");
-  const moved = { x: beforeMove.x + 10, y: beforeMove.y };
-  await expect.poll(() => position(note(page, "Offline idea"))).toEqual(moved);
+  await selectShape(page, element.id); await page.keyboard.press("Shift+ArrowRight");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
-  await note(peer, "Offline idea").click();
-  await peer.getByLabel("Object text").fill("A teammate's contribution");
-  await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await saved(page);
-  await expect.poll(() => position(note(page, "A teammate's contribution"))).toEqual(moved);
-  await page.close();
-  await peer.close();
-  await backend.restart();
-  const fresh = await context.newPage();
-  await fresh.goto(url);
-  await saved(fresh);
-  await expect.poll(() => position(note(fresh, "A teammate's contribution"))).toEqual(moved);
+  await selectShape(peer, element.id); await peer.getByTestId("strokeWidth-bold").locator("..").click(); await saved(peer);
+  await page.getByRole("button", { name: "Connect", exact: true }).click(); await saved(page);
+  await expect.poll(async () => ({ x: (await scene(page))[0].x, stroke: (await scene(page))[0].strokeWidth }))
+    .toEqual({ x: element.x + 5, stroke: 2 });
+  await page.close(); await peer.close(); await backend.restart();
+  const fresh = await context.newPage(); await fresh.goto(url); await saved(fresh);
+  await expect.poll(async () => ({ x: (await scene(fresh))[0]?.x, stroke: (await scene(fresh))[0]?.strokeWidth }))
+    .toEqual({ x: element.x + 5, stroke: 2 });
 });
 
-test("whiteboard viewers cannot mutate objects; revocation and mobile navigation work", async ({ page, browser, baseURL }) => {
+test("Excalidraw respects viewers, live revocation, mobile layout, and asset restrictions", async ({ page, browser, baseURL }) => {
   const { roomId, url } = await setup(page, baseURL);
-  await page.goto(url);
-  await saved(page);
-  await addNote(page, "Shared review");
-  await page.getByRole("button", { name: "□ Rectangle", exact: true }).click();
-  await page.getByLabel("Object text").fill("Plan");
-  await page.getByRole("button", { name: "○ Ellipse", exact: true }).click();
-  await page.getByLabel("Object text").fill("Outcome");
-  await saved(page);
+  await page.goto(url); await saved(page);
+  const element = await drawShape(page);
+  expect(await page.getByTestId("toolbar-image").count()).toBe(0);
   const viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     const viewer = await viewerContext.newPage();
     const user = await register(viewer.request, baseURL);
     const role = async (value: string) => expect((await api(page.request, baseURL, `/api/rooms/${roomId}/members/${user.username}`, "PUT", { role: value })).ok()).toBe(true);
-    await role("viewer");
-    await viewer.goto(url);
+    await role("viewer"); await viewer.goto(url);
     await expect(viewer.locator("#save-status")).toHaveText("View only");
-    await expect(viewer.getByRole("button", { name: "+ Sticky note", exact: true })).toBeDisabled();
-    // Move overlapping shapes out of the way for the review, using their owner.
-    await page.getByRole("button", { name: "Delete object", exact: true }).click();
-    await page.getByRole("button", { name: "Rectangle: Plan", exact: true }).click();
-    await page.getByRole("button", { name: "Delete object", exact: true }).click();
-    await note(viewer, "Shared review").click();
-    await expect(viewer.getByLabel("Object text")).not.toBeEditable();
-    await expect(viewer.getByLabel("Object color")).toBeDisabled();
-    const before = await position(note(viewer, "Shared review"));
-    await viewer.keyboard.press("Shift+ArrowRight");
-    await expect.poll(() => position(note(viewer, "Shared review"))).toEqual(before);
+    await expect.poll(() => viewer.evaluate(() => window.synixirWhiteboardTest?.getAppState().viewModeEnabled)).toBe(true);
+    expect(await viewer.getByTestId("toolbar-rectangle").count()).toBe(0);
+    await canvas(viewer).click(); await viewer.keyboard.press("ControlOrMeta+a"); await viewer.keyboard.press("Delete");
+    expect((await scene(viewer)).length).toBe(1);
     expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await role("editor");
-    await viewer.reload();
-    await saved(viewer);
-    await note(viewer, "Shared review").click();
-    await expect(viewer.getByLabel("Object text")).toBeEditable();
+    await role("editor"); await viewer.reload(); await saved(viewer);
+    await expect(viewer.getByTestId("toolbar-rectangle")).toBeVisible();
+    await viewer.screenshot({ path: "/tmp/synixir-whiteboard-mobile.png", fullPage: true });
+    await selectShape(viewer, element.id);
+    const point = await elementPoint(viewer, element.id);
+    const zoom = await viewer.evaluate(() => window.synixirWhiteboardTest!.getAppState().zoom.value);
+    await viewer.mouse.move(point.x - element.width * zoom / 2, point.y);
+    await viewer.mouse.down();
     await role("viewer");
-    await expect(viewer.getByLabel("Object text")).not.toBeEditable();
-    await expect(viewer.getByRole("button", { name: "Delete object", exact: true })).toBeDisabled();
+    await expect.poll(() => viewer.evaluate(() => window.synixirWhiteboardTest?.getAppState().viewModeEnabled)).toBe(true);
+    const frozen = await scene(viewer);
+    await viewer.mouse.move(point.x + 30, point.y + 30, { steps: 3 });
+    await viewer.mouse.up();
+    await expect.poll(async () => (await scene(viewer)).map(e => ({ id: e.id, x: e.x, y: e.y })))
+      .toEqual(frozen.map(e => ({ id: e.id, x: e.x, y: e.y })));
+    await expect(viewer.locator("#undo")).toBeDisabled();
+    expect((await scene(viewer))[0].id).toBe(element.id);
   } finally { await viewerContext.close(); }
-  await expect(page.getByRole("link", { name: "Try the Kanban board", exact: true })).toHaveJSProperty("href", `${baseURL}/kanban.html?room=${roomId}`);
 });

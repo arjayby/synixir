@@ -3,32 +3,26 @@ import { EditorView, drawSelection, keymap, placeholder } from "@codemirror/view
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { defaultKeymap } from "@codemirror/commands";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
-import { createFormModel, textFields, teams, priorities, channels, requiredFields, validate } from "./model.ts";
+import { createFormModel, textFields, requiredFields, validate } from "./model.ts";
+import { createFormShell } from "./form-shell.tsx";
+import { createBriefFormState, type FormFieldName } from "./form-state.ts";
 
 export function createMultiplayerForm(room: SynixirRoom) {
   const root = document.querySelector<HTMLElement>("#editor")!;
   document.querySelector<HTMLAnchorElement>("#open-peer")!.href = window.location.href;
   const model = createFormModel(room.doc);
+  const briefForm = createBriefFormState(room.doc, model);
+  const shell = createFormShell(root);
   const events = new AbortController();
   const on = <K extends keyof DocumentEventMap>(target: EventTarget, event: K, handler: (event: DocumentEventMap[K]) => void, capture = false) => target.addEventListener(event, handler as EventListener, { signal: events.signal, capture });
-  const editors = new Map();
-  const fields = new Map();
-  const touched = new Set();
+  const editors = new Map<string, { editor: EditorView; permission: Compartment }>();
+  const fields = new Map<FormFieldName, {
+    node: HTMLElement; title: HTMLElement; people: HTMLElement; control?: HTMLInputElement | HTMLSelectElement;
+  }>();
   let readOnly = true;
   let activeField: string | null = null;
   let disposed = false;
 
-  root.innerHTML = `
-    <form class="shared-form" novalidate>
-      <div class="brief-heading"><div><p class="eyebrow">PROJECT BRIEF</p><h2>Let’s get on the same page.</h2><p class="note">A shared starting point for your next project.</p></div><span id="brief-completion">0 of 4 complete</span></div>
-      <progress id="brief-progress" value="0" max="4" aria-label="Required fields completed"></progress>
-      <section class="brief-section" aria-labelledby="basics-heading"><h3 id="basics-heading"><span>01</span> The idea</h3><div id="text-fields"></div></section>
-      <section class="brief-section" aria-labelledby="details-heading"><h3 id="details-heading"><span>02</span> The details</h3><div class="brief-grid" id="detail-fields"></div></section>
-      <section class="brief-section" aria-labelledby="channels-heading"><h3 id="channels-heading"><span>03</span> Where it will live</h3><div id="channel-field"></div></section>
-      <div class="brief-actions"><p class="note">Changes save as you go. Review a live preview when you’re ready.</p><button type="submit">Review brief</button></div>
-      <p id="brief-announcement" role="status"></p>
-    </form>
-    <dialog class="brief-preview" aria-labelledby="preview-title"><div class="preview-heading"><div><p class="eyebrow">LIVE PREVIEW</p><h2 id="preview-title">Project brief</h2></div><button type="button" class="subtle" id="close-preview">Close preview</button></div><p class="note">This preview updates as your team edits. It does not submit the form.</p><dl id="preview-content"></dl></dialog>`;
   const form = root.querySelector<HTMLFormElement>("form")!;
   const dialog = root.querySelector<HTMLDialogElement>("dialog")!;
   const undo = document.querySelector<HTMLButtonElement>("#undo")!;
@@ -39,42 +33,24 @@ export function createMultiplayerForm(room: SynixirRoom) {
     if (text !== undefined) node.textContent = text;
     return node;
   }
-  function field(id: string|undefined, label: string|undefined, parent: HTMLElement, required = false) {
-    const node = element("div", "brief-field");
-    node.dataset.field = id;
-    const heading = element("div", "field-heading");
-    const title = element("label", "", label);
-    title.id = `label-${id}`;
-    title.htmlFor = `field-${id}`;
-    if (required) {
-      const marker = element("span", "required-marker", " *");
-      marker.setAttribute("aria-hidden", "true");
-      title.append(marker);
-    }
-    const people = element("span", "field-people");
-    people.id = `people-${id}`;
-    const error = element("p", "field-error");
-    error.id = `error-${id}`;
-    error.hidden = true;
-    heading.append(title, people);
-    node.append(heading, error);
-    parent.append(node);
-    fields.set(id, { node, title, people, error });
-    return node;
+  for (const node of root.querySelectorAll<HTMLElement>("[data-field]")) {
+    const id = node.dataset.field as FormFieldName;
+    fields.set(id, { node, title: root.querySelector<HTMLElement>(`#label-${id}`)!,
+      people: root.querySelector<HTMLElement>(`#people-${id}`)!,
+      control: node.querySelector<HTMLInputElement | HTMLSelectElement>("select, input[type=date]") ?? undefined,
+    });
   }
   function publish() {
     room.awareness.setLocalStateField("multiplayerForm", activeField ? { field: activeField, action: readOnly ? "viewing" : "editing" } : null);
   }
-  function activate(id: any) {
+  function activate(id: string) {
     if (activeField === id) return;
     model.history.stopCapturing();
     activeField = id;
     publish();
   }
   for (const spec of textFields) {
-    const node = field(spec.id, spec.label, root.querySelector<HTMLElement>("#text-fields")!, true);
-    const mount = element("div", `brief-text ${spec.id === "name" ? "brief-name" : ""}`);
-    node.insertBefore(mount, fields.get(spec.id).error);
+    const mount = root.querySelector<HTMLElement>(`#editor-${spec.id}`)!;
     const permission = new Compartment();
     const editor = new EditorView({
       parent: mount,
@@ -93,48 +69,17 @@ export function createMultiplayerForm(room: SynixirRoom) {
         yCollab(model.texts[spec.id], room.awareness, { undoManager: model.history }),
       ],
     });
-    on(fields.get(spec.id).title, "click", () => editor.focus());
+    on(fields.get(spec.id)!.title, "click", () => editor.focus());
     editors.set(spec.id, { editor, permission });
   }
-  function input(id: string, label: string, tag: "select" | "input", values: string[] = [], required = false) {
-    const node = field(id, label, root.querySelector<HTMLElement>("#detail-fields")!, required);
-    const control = document.createElement(tag);
-    control.id = `field-${id}`;
-    control.name = id;
-    control.required = required;
-    control.setAttribute("aria-describedby", `people-${id} error-${id}`);
-    if (tag === "select") {
-      for (const value of values) {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = value || "Choose a team";
-        control.append(option);
-      }
-    } else (control as HTMLInputElement).type = "date";
-    node.insertBefore(control, fields.get(id).error);
-    fields.get(id).control = control;
+  for (const id of ["team", "priority", "date"] as const) {
+    const control = fields.get(id)!.control!;
     on(control, "change", () => { if (!readOnly) model.set(id, control.value); });
   }
-  input("team", "Team", "select", ["", ...teams], true);
-  input("priority", "Priority", "select", priorities);
-  input("date", "Target date", "input");
-  const channelNode = field("channels", "Launch channels", root.querySelector<HTMLElement>("#channel-field")!);
-  const choices = element("div", "channel-options");
-  choices.setAttribute("role", "group");
-  choices.setAttribute("aria-labelledby", "label-channels");
-  fields.get("channels").title.removeAttribute("for");
-  for (const channel of channels) {
-    const label = element("label", "channel-option");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = channel;
-    checkbox.setAttribute("aria-describedby", "people-channels");
-    label.append(checkbox, document.createTextNode(channel));
-    choices.append(label);
-    on(checkbox, "change", () => { if (!readOnly) model.set(`channel:${channel}`, checkbox.checked); });
+  const choices = root.querySelector<HTMLElement>(".channel-options")!;
+  for (const checkbox of choices.querySelectorAll<HTMLInputElement>("input")) {
+    on(checkbox, "change", () => { if (!readOnly) model.set(`channel:${checkbox.value}`, checkbox.checked); });
   }
-  channelNode.insertBefore(choices, fields.get("channels").error);
-  channelNode.append(element("p", "note", "Choose as many as you need. You can decide later."));
 
   on(form, "focusin", (event) => {
     const id = (event.target as Element).closest<HTMLElement>("[data-field]")?.dataset.field;
@@ -142,7 +87,7 @@ export function createMultiplayerForm(room: SynixirRoom) {
   });
   on(form, "focusout", (event) => {
     const id = (event.target as Element).closest<HTMLElement>("[data-field]")?.dataset.field;
-    if (id) { touched.add(id); render(); }
+    if (id && fields.has(id as FormFieldName)) briefForm.touch(id as FormFieldName);
     if ((event.relatedTarget as Element | null)?.closest<HTMLElement>("[data-field]")?.dataset.field !== activeField) {
       activeField = null;
       model.history.stopCapturing();
@@ -170,22 +115,19 @@ export function createMultiplayerForm(room: SynixirRoom) {
     event.preventDefault();
     if (!readOnly) key === "y" || event.shiftKey ? model.history.redo() : model.history.undo();
   });
-  on(form, "submit", (event) => {
-    event.preventDefault();
-    for (const id of fields.keys()) touched.add(id);
-    render();
-    const errors = validate(model.values());
-    const first = Object.keys(errors)[0];
-    if (first) {
-      root.querySelector<HTMLElement>("#brief-announcement")!.textContent = "Complete the highlighted fields to review your brief.";
-      if (editors.has(first)) editors.get(first).editor.focus();
-      else fields.get(first).control.focus();
-      return;
-    }
+  const review = briefForm.control.handleSubmit(() => {
+    if (disposed) return;
     root.querySelector<HTMLElement>("#brief-announcement")!.textContent = "";
     renderPreview(model.values());
-    dialog.showModal();
+    if (!dialog.open) dialog.showModal();
+  }, errors => {
+    if (disposed) return;
+    const first = Object.keys(errors)[0];
+    root.querySelector<HTMLElement>("#brief-announcement")!.textContent = "Complete the highlighted fields to review your brief.";
+    if (first && editors.has(first)) editors.get(first)!.editor.focus();
+    else if (first) fields.get(first as FormFieldName)?.control?.focus();
   });
+  on(form, "submit", event => { event.preventDefault(); void review(); });
   on(root.querySelector<HTMLButtonElement>("#close-preview")!, "click", () => dialog.close());
 
   function renderPreview(values: import("./model.ts").FormValues) {
@@ -203,16 +145,11 @@ export function createMultiplayerForm(room: SynixirRoom) {
     if (disposed) return;
     const values = model.values();
     const errors = validate(values);
-    for (const [id, { control, error }] of fields) {
+    for (const [id, { control }] of fields) {
       if (control) {
-        if (control.value !== String(values[id as keyof typeof values] ?? "")) control.value = String(values[id as keyof typeof values] ?? "");
+        if (control.value !== String(values[id] ?? "")) control.value = String(values[id] ?? "");
         control.disabled = readOnly;
       }
-      const message = touched.has(id) ? errors[id] ?? "" : "";
-      if (error.textContent !== message) error.textContent = message;
-      error.hidden = !message;
-      const target = control ?? editors.get(id)?.editor.contentDOM;
-      if (target) target.setAttribute("aria-invalid", String(Boolean(message)));
     }
     for (const checkbox of choices.querySelectorAll<HTMLInputElement>("input")) {
       checkbox.checked = values.channels.includes(checkbox.value);
@@ -237,6 +174,26 @@ export function createMultiplayerForm(room: SynixirRoom) {
       node.classList.toggle("has-collaborator", current.length > 0);
     }
   }
+  let reviewing = false;
+  function renderValidation() {
+    if (disposed) return;
+    const errors: Record<string, string> = {};
+    for (const [id, { control }] of fields) {
+      const message = briefForm.control.getFieldState(id).error?.message;
+      if (message) errors[id] = message;
+      const target = control ?? editors.get(id)?.editor.contentDOM;
+      target?.setAttribute("aria-invalid", String(Boolean(message)));
+    }
+    if (Object.keys(errors).length === 0) root.querySelector<HTMLElement>("#brief-announcement")!.textContent = "";
+    shell.update({ errors, readOnly, reviewing });
+  }
+  const unsubscribeForm = briefForm.control.subscribe({
+    formState: { errors: true, touchedFields: true, isValidating: true },
+    callback: state => {
+      reviewing = state.isValidating ?? reviewing;
+      renderValidation();
+    },
+  });
   for (const text of Object.values(model.texts)) text.observe(render);
   model.properties.observe(render);
   room.awareness.on("change", renderPresence);
@@ -248,11 +205,13 @@ export function createMultiplayerForm(room: SynixirRoom) {
     for (const text of Object.values(model.texts)) text.unobserve(render);
     model.properties.unobserve(render);
     room.awareness.off("change", renderPresence);
+    unsubscribeForm();
+    briefForm.destroy();
     for (const { editor } of editors.values()) editor.destroy();
     model.destroy();
     clearPresence();
     dialog.close();
-    root.replaceChildren();
+    shell.destroy();
   }
   destroy.setReadOnly = (value: boolean) => {
     if (value !== readOnly) {
@@ -260,6 +219,7 @@ export function createMultiplayerForm(room: SynixirRoom) {
       for (const { editor, permission } of editors.values()) editor.dispatch({ effects: permission.reconfigure(EditorState.readOnly.of(value)) });
       publish();
       render();
+      renderValidation();
     }
     renderPresence();
   };

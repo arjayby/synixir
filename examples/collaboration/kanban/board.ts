@@ -1,5 +1,6 @@
 import type { SynixirRoom } from "@synixir/client";
 import { createBoardModel, columns, colors } from "./model.ts";
+import { mountBoardView } from "./board-view.tsx";
 
 export function createBoard(room: SynixirRoom) {
   const root = document.querySelector<HTMLElement>("#editor")!;
@@ -12,7 +13,6 @@ export function createBoard(room: SynixirRoom) {
   let returnFocusId: string|null|undefined = null;
   let draggedId: string|null = null;
   let disposed = false;
-  const nodes = new Map();
   const undo = document.querySelector<HTMLButtonElement>("#undo")!;
   const redo = document.querySelector<HTMLButtonElement>("#redo")!;
   const announce = (text: string|null) => { document.querySelector<HTMLElement>("#board-announcement")!.textContent = text; };
@@ -23,46 +23,8 @@ export function createBoard(room: SynixirRoom) {
     if (text !== undefined) node.textContent = text;
     return node;
   }
-  const board = element("div", "kanban-board");
-  for (const column of columns) {
-    const section = element("section", `kanban-column column-${column.id}`);
-    section.dataset.column = column.id;
-    section.setAttribute("aria-label", column.label);
-    const header = element("div", "column-heading");
-    const title = element("h2", "", column.label);
-    const count = element("span", "column-count", "0");
-    const add = element("button", "add-card", "+ Add card");
-    add.type = "button";
-    add.setAttribute("aria-label", `Add card to ${column.label}`);
-    add.disabled = true;
-    const list = element("div", "card-list");
-    header.append(title, count);
-    section.append(header, list, add);
-    board.append(section);
-    nodes.set(column.id, { section, list, count, add });
-    listen(add, "click", () => {
-      if (readOnly) return;
-      openCard(model.add(column.id));
-      titleInput.select();
-    });
-    listen(section, "dragover", (event) => {
-      if (readOnly || !draggedId) return;
-      event.preventDefault();
-      event.dataTransfer!.dropEffect = "move";
-      section.classList.add("drop-target");
-    });
-    listen(section, "dragleave", (event) => {
-      if (!section.contains(event.relatedTarget as Node | null)) section.classList.remove("drop-target");
-    });
-    listen(section, "drop", (event) => {
-      event.preventDefault();
-      if (!readOnly && draggedId) {
-        model.move(draggedId, column.id);
-        announce(`Card moved to ${column.label}.`);
-      }
-      endDrag();
-    });
-  }
+  const board = element("div", "kanban-mount");
+  const view = mountBoardView(board);
 
   const dialog = element("dialog", "card-dialog");
   dialog.setAttribute("aria-labelledby", "card-dialog-heading");
@@ -104,9 +66,12 @@ export function createBoard(room: SynixirRoom) {
     renderPresence();
     titleInput.focus();
   }
-  function endDrag() {
+  function endDrag(id?: string, column?: string, beforeId?: string | null) {
+    if (!readOnly && id && column) {
+      model.move(id, column, beforeId);
+      announce(`Card moved to ${columns.find(item => item.id === column)?.label ?? column}.`);
+    }
     draggedId = null;
-    nodes.forEach(({ section }) => section.classList.remove("drop-target"));
     publish();
     render();
   }
@@ -204,50 +169,19 @@ export function createBoard(room: SynixirRoom) {
     redo.disabled = readOnly || !model.history.canRedo();
   }
   function render() {
-    // Keep the browser's dragged element mounted while remote changes arrive.
-    // The model still syncs immediately; endDrag renders the latest state.
+    // dnd-kit owns the preview DOM until drop. Remote updates still apply to
+    // the model immediately; endDrag renders the latest shared state.
     if (disposed || draggedId) return;
-    const focusedId = document.activeElement?.closest<HTMLElement>(".kanban-card")?.dataset.cardId;
-    const cards = model.list();
-    for (const column of columns) {
-      const { list, count, add } = nodes.get(column.id);
-      const items = cards.filter(card => card.placement.column === column.id);
-      count.textContent = items.length;
-      add.disabled = readOnly;
-      list.replaceChildren(...items.map(card => {
-        const node = element("article", `kanban-card card-${card.color}`);
-        node.dataset.cardId = card.id;
-        node.draggable = !readOnly;
-        const open = element("button", "card-open");
-        open.type = "button";
-        open.setAttribute("aria-label", `Open card: ${card.title || "Untitled card"}`);
-        open.append(element("span", "card-title", card.title || "Untitled card"));
-        if (card.description) open.append(element("span", "card-description", card.description));
-        open.append(element("span", "card-presence"));
-        const grip = element("span", "card-grip", "⠿");
-        grip.draggable = !readOnly;
-        grip.hidden = readOnly;
-        grip.title = "Drag card between columns";
-        grip.setAttribute("aria-hidden", "true");
-        node.append(open, grip);
-        // These listeners belong to these short-lived nodes, not the root's
-        // abort signal, which would retain detached cards on every update.
-        open.addEventListener("click", () => openCard(card.id));
-        node.addEventListener("dragstart", event => {
-          if (readOnly) return event.preventDefault();
-          draggedId = card.id;
-          event.dataTransfer!.setData("text/plain", card.id);
-          event.dataTransfer!.effectAllowed = "move";
-          publish("moving", card.id);
-        });
-        node.addEventListener("dragend", endDrag);
-        return node;
-      }));
-      if (!items.length) list.append(element("p", "column-empty", column.id === "done" ? "Finished work lands here." : "No cards yet."));
-    }
-    if (focusedId) {
-      [...root.querySelectorAll<HTMLElement>(".kanban-card")].find(node => node.dataset.cardId === focusedId)?.querySelector<HTMLButtonElement>("button")!.focus();
-    }
+    view.render({
+      cards: model.list(), readOnly, onOpen: openCard,
+      onAdd: column => {
+        if (readOnly) return;
+        openCard(model.add(column));
+        titleInput.select();
+      },
+      onDragStart: id => { draggedId = id; publish("moving", id); },
+      onDragEnd: endDrag, onRender: renderPresence,
+    });
     renderDialog();
     renderPresence();
     renderHistory();
@@ -262,14 +196,17 @@ export function createBoard(room: SynixirRoom) {
     events.abort();
     model.cards.unobserveDeep(render);
     room.awareness.off("change", renderPresence);
+    view.cancel();
+    view.destroy();
     model.destroy();
+    publish("viewing", null);
     dialog.close();
     root.replaceChildren();
   }
   destroy.setReadOnly = (value: boolean) => {
     if (readOnly !== value) {
       readOnly = value;
-      if (readOnly) endDrag();
+      if (readOnly) view.cancel();
       render();
     }
     renderPresence();

@@ -62,6 +62,10 @@ if database = System.get_env("SYNIXIR_OPERATIONS_DATABASE") do
 end
 
 if config_env() == :test and System.get_env("SYNIXIR_BROWSER_TEST") == "true" do
+  frontend_port = System.get_env("SYNIXIR_TEST_FRONTEND_PORT", "5174")
+
+  config :synixir, SynixirWeb.Endpoint, check_origin: ["http://127.0.0.1:#{frontend_port}"]
+
   # Browser tests use committed data across independent processes. Sandbox
   # retains connections for long-lived channels and documents, exhausting the
   # pool before later HTTP requests can run. Keep ExUnit's Sandbox separate.

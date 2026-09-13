@@ -2,10 +2,11 @@ import { createConnection } from "node:net";
 import { request } from "node:http";
 import { randomBytes } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
+import { backendPort, backendURL, frontendURL } from "./ports.ts";
 
 test("the WebSocket handshake rejects an untrusted browser origin", async () => {
   const status = await new Promise((resolve, reject) => {
-    const req = request("http://127.0.0.1:4010/socket/websocket?vsn=2.0.0", {
+    const req = request(`${backendURL}/socket/websocket?vsn=2.0.0`, {
       headers: {
         Origin: "https://untrusted.example",
         Connection: "Upgrade",
@@ -42,7 +43,7 @@ function frame(size: number, opcode: number, final: boolean) {
 
 for (const fragmented of [false, true]) {
   test(`transport rejects an oversized ${fragmented ? "fragmented message" : "frame"} before channel processing`, async () => {
-    const socket = createConnection({ host: "127.0.0.1", port: 4010 });
+    const socket = createConnection({ host: "127.0.0.1", port: backendPort });
     let timeout;
     try {
       const code = await new Promise((resolve, reject) => {
@@ -53,8 +54,8 @@ for (const fragmented of [false, true]) {
         socket.on("close", () => reject(new Error("Connection closed without a WebSocket close frame")));
         socket.on("connect", () => socket.write([
           "GET /socket/websocket?vsn=2.0.0 HTTP/1.1",
-          "Host: 127.0.0.1:4010",
-          "Origin: http://127.0.0.1:5174",
+          `Host: 127.0.0.1:${backendPort}`,
+          `Origin: ${frontendURL}`,
           "Connection: Upgrade",
           "Upgrade: websocket",
           "Sec-WebSocket-Version: 13",

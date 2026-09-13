@@ -1,67 +1,13 @@
-.whiteboard-page { background: #f3f6f4; }
-.whiteboard-page main { max-width: 1600px; }
-.whiteboard-page .workspace { grid-template-columns: minmax(0, 1fr) 235px; gap: 24px; }
-.whiteboard-page .workspace-heading { margin-top: 26px; }
-.whiteboard-page button, .whiteboard-page label, .whiteboard-page input,
-.whiteboard-page select, .whiteboard-page h2, .whiteboard-page #status,
-.whiteboard-page .history-controls button, .whiteboard-page #participants li { font-size: 14px; }
-.whiteboard-page .note, .whiteboard-page .page-footer, .whiteboard-page .editor-footer { font-size: 13px; }
-.whiteboard-page .document-title { font-size: 16px; }
-.whiteboard-page .participant-avatar { display: grid; place-items: center; width: 28px; height: 28px; color: white; font-size: 12px; font-weight: 600; }
-.whiteboard-tools { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 14px; border-bottom: 1px solid #d6e0d9; }
-.object-tools, .zoom-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.whiteboard-page .whiteboard-tools button { padding: 8px 12px; background: #fff; color: #294f3c; }
-.whiteboard-page .whiteboard-tools button:hover:not(:disabled) { background: #e4eee8; }
-.whiteboard-page .whiteboard-tools [data-add="sticky"] { background: #fff2a8; border-color: #d9c76b; color: #514513; }
-#zoom-level { min-width: 46px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
-#whiteboard-viewport { height: 520px; width: 100%; overflow: auto; overscroll-behavior: contain; background: #fafcfb; position: relative; }
-.canvas-sizer { position: relative; }
-.whiteboard-canvas { position: relative; transform-origin: top left; background-image: radial-gradient(#c6d4cb 1px, transparent 1px); background-size: 24px 24px; overflow: hidden; }
-.object-layer, .presence-layer { position: absolute; inset: 0; }
-.object-layer { isolation: isolate; }
-.presence-layer { pointer-events: none; z-index: 2; }
-.whiteboard-page .whiteboard-object { position: absolute; left: 0; top: 0; margin: 0; padding: 18px; color: #263b30; border: 1px solid #86a496; font-size: 20px; font-weight: 500; line-height: 1.45; text-align: center; white-space: pre-wrap; overflow: hidden; overflow-wrap: anywhere; user-select: none; touch-action: none; cursor: move; border-radius: 8px; }
-.whiteboard-page .object-sticky { text-align: left; border-radius: 1px; border-color: #d2c271; box-shadow: 2px 5px 9px #28332c15; }
-.whiteboard-page .object-ellipse { border-radius: 50%; padding: 22px 28px; }
-.whiteboard-page .whiteboard-object.color-yellow { background: #fff0a4; }
-.whiteboard-page .whiteboard-object.color-blue { background: #d6e7ff; }
-.whiteboard-page .whiteboard-object.color-mint { background: #d5eedd; }
-.whiteboard-page .whiteboard-object.color-rose { background: #f9dbe3; }
-.whiteboard-page .whiteboard-object.color-white { background: #fff; }
-.whiteboard-page .whiteboard-object.is-selected { outline: 2px solid #285c43; outline-offset: 4px; }
-.whiteboard-page .whiteboard-object:focus-visible { outline: 3px solid #285c43; outline-offset: 5px; }
-.canvas-empty { position: absolute; left: 36px; top: 40px; color: #4f6d5c; font-size: 25px; font-weight: 500; pointer-events: none; max-width: 260px; }
-.canvas-empty span { display: block; font-size: 16px; line-height: 1.6; font-weight: 400; margin-top: 8px; }
-.canvas-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 16px; border-top: 1px solid #d6e0d9; color: #52695b; font-size: 13px; }
-.remote-selection { position: absolute; left: 0; top: 0; border: 2px solid; outline: 1px solid #fff; }
-.remote-selection > span { position: absolute; left: -2px; bottom: calc(100% + 2px); color: white; font-size: 13px; line-height: 1.4; padding: 3px 7px; border-radius: 4px 4px 0 0; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-.remote-cursor { position: absolute; left: 0; top: 0; will-change: transform; }
-.remote-cursor > svg { display: block; width: 28px; height: 28px; fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
-.remote-cursor > span { position: absolute; left: 24px; top: 22px; border-radius: 10px; padding: 6px 11px; color: #fff; font-size: 16px; font-weight: 500; line-height: 1.25; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.object-inspector { padding: 18px; border-top: 1px solid #d6e0d9; background: #f7faf8; }
-#selection-empty { margin: 0; font-size: 14px; color: #52695b; line-height: 1.6; }
-.inspector-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 12px; }
-.inspector-heading h2 { margin: 0; }
-.inspector-heading > div { display: flex; flex-wrap: wrap; gap: 8px; }
-.whiteboard-page #delete-object { color: #9d3838; }
-.inspector-fields { display: grid; grid-template-columns: minmax(140px, 2fr) minmax(95px, 1fr) 85px 85px; gap: 14px; align-items: start; }
-.inspector-fields textarea, .inspector-fields select { width: 100%; font: inherit; color: inherit; }
-.inspector-fields textarea { border: 1px solid #b6c2b9; border-radius: 6px; padding: 10px; line-height: 1.5; resize: vertical; }
-.inspector-fields input { font-size: 16px; }
-.inspector-fields textarea:read-only { background: #eef2ef; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-@media (max-width: 1150px) {
-  .whiteboard-page .workspace { grid-template-columns: minmax(0, 1fr); }
-  .whiteboard-page aside { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
-  .whiteboard-page .people-panel { border-top: 0; padding-top: 0; }
-  .whiteboard-page #editor-help { grid-column: 1 / -1; }
-}
-@media (max-width: 640px) {
-  .whiteboard-page main { padding: 0 16px; }
-  .whiteboard-page aside { grid-template-columns: minmax(0, 1fr); }
-  #whiteboard-viewport { height: 440px; }
-  .inspector-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .object-text-field { grid-column: 1 / -1; }
-  .inspector-heading { align-items: flex-start; flex-wrap: wrap; }
-  .whiteboard-page .editor-footer { flex-wrap: wrap; }
-}
+.whiteboard-surface { min-width: 0; }
+.excalidraw-shell { position: relative; width: 100%; height: 640px; min-width: 0; }
+/* The workspace Undo/Redo buttons use Yjs history and keep remote edits intact. */
+.excalidraw-shell .excalidraw .undo-redo-buttons { display: none; }
+@media (max-width: 600px) { .excalidraw-shell { height: 560px; } }
+
+/* Give the drawing tools enough room before Excalidraw switches to mobile UI. */
+.whiteboard-page .workspace-grid { grid-template-columns: minmax(0, 1fr); }
+.whiteboard-page .room-sidebar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.excalidraw-shell [data-testid="button-undo"], .excalidraw-shell [data-testid="button-redo"],
+.excalidraw-shell [data-testid="toolbar-embeddable"] { display: none !important; }
+@media (max-width: 900px) { .whiteboard-page .room-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .whiteboard-page .room-sidebar { grid-template-columns: minmax(0, 1fr); } }

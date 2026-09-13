@@ -196,8 +196,9 @@ The production build also includes `/kanban.html`.
 
 - Add cards to Backlog, In progress, or Done. Open a card to edit its title,
   description, color, and status. Changes save as you type.
-- Drag cards between columns, or use the status selector with a keyboard or on
-  a touch device. Moved cards go to the end of the destination column.
+- Drag cards within or between columns using a mouse or touch. Focus a card's
+  move handle and press Space to sort with the keyboard, then Escape to cancel.
+  The status selector remains available for moving a card to another column.
 - Open the same board in two tabs to see changes and card activity. To collaborate
   with another account, grant its username access under **Manage access**.
 - Undo and redo affect this tab's local changes. Deleted cards can be restored
@@ -211,8 +212,10 @@ so simultaneous moves converge to one location without duplicating a card.
 Edits to different fields merge. Concurrent edits to the same title, description,
 color, or placement resolve through Y.Map's conflict rules to one value; these
 fields do not provide character-level text merging. A deletion wins over a
-concurrent edit to that card. Ordering ties use the card ID. This first example
-has fixed columns and does not support reordering within a column.
+concurrent edit to that card. Fixed columns support card reordering through
+`@dnd-kit/react`. Fractional ranks include stable card IDs to resolve ordering
+ties without rewriting a column. Existing numeric orders remain readable.
+See the [kanban integration notes](examples/collaboration/kanban/README.md).
 
 The [shared React application](examples/collaboration/components/example-app.tsx) owns account,
 room, connection, permission, and cleanup UI for all examples. Each editing
@@ -236,32 +239,28 @@ same development servers running. Sign in and create a room, or open an existing
 one. Links between the examples retain the room.
 Each example stores its data separately inside that room's Yjs document.
 
-- Add sticky notes, rectangles, and ellipses. Select an object to edit its text,
-  color, width, or height, bring it to the front, or delete it.
-- Drag objects with a mouse or touch. Arrow keys move the selected object one
-  canvas pixel; Shift + arrows move it ten. Escape cancels an active drag.
-- Scroll around the fixed 1600 × 1000 canvas. Zoom controls range from 50% to
-  150%; zoom and scroll are local to each tab.
-- Teammates see cursors, selection outlines, and live movement previews. Presence
-  labels are client-supplied and do not establish identity or lock objects.
-- Remote cursors and drag previews interpolate between presence updates with
-  an 80 ms animation. Local dragging updates on the next animation frame without
-  interpolation. Reduced-motion preferences disable interpolation. Cursor updates
-  reuse existing activity elements and do not rebuild the participant list or
-  edit controls. Presence still sends at most one scheduled movement update per
-  60 ms, with immediate final positions and activity changes.
-- A completed drag saves one position change and creates one undo step. Movement
-  previews use temporary awareness state. Cancelling a drag or closing its tab
-  before releasing it leaves the saved position unchanged.
-- Undo and redo affect this tab's changes. Viewers can select objects and publish
-  cursors, but cannot change content, geometry, or layer order.
+- Draw shapes, freehand lines, text, and arrows with Excalidraw's native tools.
+  Select, resize, group, and reorder objects, or pan and zoom around the scene.
+- Teammates see cursors, selections, and live changes. Presence labels are
+  client-supplied and do not establish identity or lock objects.
+- Undo and redo affect this tab's changes. A pointer gesture creates one undo
+  item. Shape changes synchronize during the gesture.
+- Viewers can explore the scene and publish cursors, but cannot edit it.
+- Fonts load from local assets included in development and production builds.
+  Image insertion, embedded content, and scene-file import are disabled because
+  this example has no attachment store. Local drawing export is available.
 
-The [whiteboard model](examples/collaboration/whiteboard/model.ts) uses nested
-Y.Maps under `whiteboard:objects:v1`. Position and size are separate atomic values,
-so moving an object does not overwrite a teammate's text or color edits.
-Simultaneous edits to the same property resolve to one value through Y.Map's
-conflict rules. Text does not merge at the character level. Deleting an object
-wins over a concurrent edit to that object. The UI bounds objects to the canvas.
+The [whiteboard model](examples/collaboration/whiteboard/model.ts) stores creation
+records in `whiteboard:elements:v2` and property changes in `whiteboard:fields:v2`.
+Position and size are separate atomic pairs, so moving an object does not overwrite
+another participant's text or color edits. Concurrent changes to the same field
+resolve through Yjs conflict rules. Text does not merge at the character level.
+Deletion wins over a concurrent property edit.
+
+Saved `whiteboard:objects:v1` scenes remain readable through a deterministic
+adapter, including their sticky-note labels. Opening an old room does not write
+migration updates. See the [Excalidraw integration notes](examples/collaboration/whiteboard/README.md)
+for the scene model, asset setup, and package constraints.
 
 Offline edits remain in the open tab until reconnecting. Wait for **Saved** before
 closing it. The production build includes `/whiteboard.html` and uses the same
@@ -335,6 +334,9 @@ The [form model](examples/collaboration/multiplayer-form/model.ts) stores text i
 separate top-level Y.Text fields named `multiplayer-form:<field>:v1`, with choices
 in `multiplayer-form:properties:v1`. The text controls reuse the existing
 CodeMirror/Yjs binding for shared selections, composition input, and undo.
+React Hook Form tracks local touched fields and review state, with Zod validation
+through `@hookform/resolvers`. Incomplete shared drafts remain in Yjs while users
+edit. See the [form integration notes](examples/collaboration/multiplayer-form/README.md).
 The `multiplayerForm` awareness field identifies the active form field. All data
 is separate from the other examples, with the same room permissions and storage.
 
@@ -354,15 +356,16 @@ Open [127.0.0.1:5173/flowchart.html](http://127.0.0.1:5173/flowchart.html) with 
 same development servers running. Create a room or use an existing one, then open
 another tab to build a workflow together.
 
-- Add process, decision, and start/end nodes. Drag nodes, move them with arrow
-  keys, and edit their labels, colors, and sizes. Zoom and scroll to explore.
+- Add process, decision, and start/end nodes. React Flow provides dragging,
+  resize handles, pan/zoom controls, and a minimap. Arrow keys move selected
+  nodes; the inspector edits labels, colors, and sizes.
 - Select a source node and choose a destination in **Connect to**, or use
-  **Pick on canvas** and click another node. Label branches such as Yes and No.
+  **Pick on canvas** and click another node. You can also drag between node
+  connection handles. Label branches such as Yes and No.
 - Select an arrow or its entry in **Connections** to edit its label or delete it.
   Deleting a node removes its attached arrows. One undo restores both.
 - Live cursors, collaborator selections, and drag previews show where teammates
   are working. Arrows follow the displayed node positions during dragging.
-  Cursor labels use participant colors with white text, matching the whiteboard.
 - Undo and redo affect this tab's changes. Viewers can explore and select nodes
   and connections, while edits and history controls require editing permission.
 
@@ -376,8 +379,8 @@ Arrows with deleted endpoints stay hidden, including ones created offline during
 a deletion. Undo can restore their endpoints.
 
 The `flowchart` awareness field carries temporary cursor, selection, and drag
-positions. The canvas reuses the whiteboard's motion helper and commits one
-position change per completed drag. Other examples keep separate data and cursor
+positions. The React Flow adapter interpolates remote drag previews and commits
+one position change per completed drag. Other examples keep separate data and cursor
 fields within the same room. This is a diagram editor; it does not execute workflows
 or automatically route arrows around intervening nodes.
 
@@ -427,8 +430,11 @@ columns independently of concurrent renames or text edits.
 Deleted cells remain in the document so undo can restore them. The UI allows
 adding up to 100 rows and 12 columns, and pasting at most 50,000 characters at a
 time. These are example interaction limits, not server-enforced quotas;
-concurrent additions can exceed them. Only the active cell mounts a CodeMirror
-editor. Other cells keep stable DOM elements and display shared text updates.
+concurrent additions can exceed them. `react-data-grid` provides navigation,
+resizable columns, and virtualization. Column widths are local to each tab.
+The active cell and cells with remote editors mount CodeMirror bindings so peers'
+carets remain visible. Other visible cells render plain text. See the
+[table integration notes](examples/collaboration/table/README.md).
 The `collaborativeTable` awareness field carries the selected row and column;
 text caret positions use the existing CodeMirror/Yjs awareness binding.
 

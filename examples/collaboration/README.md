@@ -11,7 +11,7 @@ npm ci
 npm run dev --workspace synixir-collaboration-example
 ```
 
-The `predev` step compiles the SDK. Open http://127.0.0.1:5173. The development
+The `predev` step compiles the SDK and copies Excalidraw fonts into local assets. Open http://127.0.0.1:5173. The development
 server in `dev.ts` proxies `/api` and `/socket` to Phoenix at
 http://127.0.0.1:4000; set `SYNIXIR_ENDPOINT` to override it. The proxy preserves
 the browser's Origin header so Phoenix can enforce its origin allowlist.
@@ -23,6 +23,25 @@ The editor/canvas modules mount inside a React-owned host and release their
 listeners and bindings when that host unmounts. They load only when selected.
 `components/ui/` contains the generated shadcn primitives, and
 `app/globals.css` contains Tailwind, theme tokens, and shared layout styles.
+
+## Libraries by example
+
+| Example | UI and editing packages | Shared data |
+|---|---|---|
+| Text editor | CodeMirror 6, `y-codemirror.next` | Y.Text |
+| [Kanban](kanban/README.md) | `@dnd-kit/react`, `@dnd-kit/collision` | Y.Map cards and sortable placements |
+| [Whiteboard](whiteboard/README.md) | `@excalidraw/excalidraw` | Yjs creation records and field changes |
+| Rich text | Tiptap and its collaboration extension | Y.XmlFragment |
+| [Project brief](multiplayer-form/README.md) | React Hook Form, `@hookform/resolvers`, Zod, CodeMirror | Y.Text fields and Y.Map choices |
+| [Flowchart](flowchart/README.md) | `@xyflow/react` | Y.Map nodes and connections |
+| [Table](table/README.md) | `react-data-grid`, CodeMirror | Y.Text cells and Y.Map schema |
+| Shared settings | Native controls and `@synixir/client` | Y.Map |
+
+Every example uses the same Synixir/Phoenix connection and persistence. The UI
+packages do not introduce another collaboration service. The text, rich-text,
+and shared-settings examples retain their existing integrations.
+
+## Checks and production build
 
 ```sh
 npm run typecheck
@@ -39,6 +58,9 @@ preserved in development and production. Navigation uses full page loads to
 retain the unsaved-edit warning and tear down old room connections.
 
 Browser tests run on ports 5174 and 4010 with a separate Phoenix test database.
+When testing separate Git worktrees in parallel, set `SYNIXIR_TEST_FRONTEND_PORT`
+and `SYNIXIR_TEST_BACKEND_PORT` to a unique pair for each run. The test server's
+origin allowlist follows the selected frontend port.
 They enable a development-only inspection adapter for public SDK and editor
 APIs; production builds exclude it. The package consumer check also uses Vite
 to verify that the published SDK works outside Next.js.

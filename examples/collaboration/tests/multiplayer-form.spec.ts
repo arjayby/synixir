@@ -55,6 +55,27 @@ test("form shares fields, field presence and local undo without replacing focuse
   await saved(page);
 });
 
+test("form validation stays local and remote corrections preserve the active editor", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  const peer = await context.newPage();
+  await peer.goto(url);
+  await saved(peer);
+  const name = field(page, "Project name");
+  const original = await name.elementHandle();
+  await name.fill("N".repeat(121));
+  await hasValue(peer, "Project name", "N".repeat(121));
+  await expect(page.locator("#error-name")).toHaveCount(0);
+  await field(page, "What are we making?").click();
+  await expect(page.locator("#error-name")).toHaveText("Use 120 characters or fewer.");
+  await expect(peer.locator("#error-name")).toHaveCount(0);
+  await field(peer, "Project name").fill("A corrected shared draft");
+  await expect(page.locator("#error-name")).toHaveCount(0);
+  await hasValue(page, "Project name", "A corrected shared draft");
+  await expect(field(page, "What are we making?")).toBeFocused();
+  expect(await name.evaluate((node, before) => node === before, original)).toBe(true);
+  await saved(peer);
+});
+
 test("same-field offline edits and checkbox choices merge and persist after restart", async ({ page, context, baseURL, backend }) => {
   const { url } = await setup(page, baseURL);
   await field(page, "Project name").fill("Launch");
@@ -91,7 +112,7 @@ test("same-field offline edits and checkbox choices merge and persist after rest
   await expect(fresh.getByRole("checkbox", { name: "Website", exact: true })).toBeChecked();
 });
 
-test("form validates required fields, shows a live preview and keeps other example content separate", async ({ page, context, baseURL }) => {
+test("form validates required fields, shows a live preview and keeps other example content separate", async ({ page, context, baseURL }, testInfo) => {
   const { roomId, url } = await setup(page, baseURL);
   await page.getByRole("button", { name: "Review brief", exact: true }).click();
   await expect(field(page, "Project name")).toHaveAttribute("aria-invalid", "true");
@@ -99,7 +120,9 @@ test("form validates required fields, shows a live preview and keeps other examp
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await fillBrief(page);
   await expect(page.locator("#brief-completion")).toHaveText("4 of 4 complete");
+  await expect(page.locator("#brief-announcement")).toHaveText("");
   await page.getByLabel("Target date", { exact: true }).fill("2027-06-15");
+  await page.screenshot({ path: testInfo.outputPath("form-desktop.png"), fullPage: true });
   await page.getByRole("button", { name: "Review brief", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("A shared launch");
   await expect(page.getByRole("dialog")).toContainText("2027-06-15");
@@ -119,7 +142,7 @@ test("form validates required fields, shows a live preview and keeps other examp
   await hasValue(peer, "Project name", "A better shared launch");
 });
 
-test("form viewers and revoked editors cannot mutate fields or use history; mobile fits", async ({ page, browser, baseURL }) => {
+test("form viewers and revoked editors cannot mutate fields or use history; mobile fits", async ({ page, browser, baseURL }, testInfo) => {
   const { roomId, url } = await setup(page, baseURL);
   await fillBrief(page);
   const viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -136,6 +159,7 @@ test("form viewers and revoked editors cannot mutate fields or use history; mobi
     await field(viewer, "Who is it for?").click();
     await expect(page.locator("#people-audience")).toHaveText(`${user.username} viewing`);
     expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await viewer.screenshot({ path: testInfo.outputPath("form-mobile.png"), fullPage: true });
     await role("editor");
     await viewer.reload();
     await saved(viewer);

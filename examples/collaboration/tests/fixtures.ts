@@ -2,10 +2,11 @@ import { test as base, expect, type Page } from "@playwright/test";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
+import { backendPort, backendURL } from "./ports.ts";
 
 const cwd = fileURLToPath(new URL("../../..", import.meta.url));
-const env = { ...process.env, MIX_ENV: "test", PHX_SERVER: "true", PORT: "4010", SYNIXIR_BROWSER_TEST: "true" };
-const endpoint = "http://127.0.0.1:4010/robots.txt";
+const env = { ...process.env, MIX_ENV: "test", PHX_SERVER: "true", PORT: String(backendPort), SYNIXIR_BROWSER_TEST: "true" };
+const endpoint = `${backendURL}/robots.txt`;
 
 interface Backend { logs(): string; restart(): Promise<void>; compact(room: string): string }
 export const test = base.extend<{ pageErrors: void }, { backend: Backend }>({
@@ -33,7 +34,7 @@ export const test = base.extend<{ pageErrors: void }, { backend: Backend }>({
     }
 
     async function start() {
-      if (await ready()) throw new Error("Port 4010 is already in use");
+      if (await ready()) throw new Error(`Port ${backendPort} is already in use`);
       output = "";
       child = spawn("mix", ["phx.server"], { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
       exited = once(child, "exit");

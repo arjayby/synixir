@@ -62,3 +62,82 @@ test("arrows reject missing endpoints and self loops; reverse paths and branches
     assert.equal(second.connections().length, 3);
   } finally { close(); }
 });
+
+// Exercise the boundary used by React Flow rather than duplicating its drag
+// implementation. Only a completed local gesture may change the document.
+import { createFlowchartAdapter } from "./adapter.ts";
+
+test("React Flow selection, measurement and drag previews never persist; one drop is one undo step", () => {
+  const doc = new Y.Doc();
+  const model = createFlowchartModel(doc), adapter = createFlowchartAdapter(model);
+  adapter.setReadOnly(false);
+  const id = adapter.add("process", { x: 80, y: 80 })!;
+  let updates = 0;
+  doc.on("update", () => updates++);
+  adapter.selectNode(id);
+  adapter.nodeChanges([{ id, type: "dimensions", dimensions: { width: 200, height: 90 } }]);
+  adapter.beginGesture(id, "drag");
+  for (let i = 1; i <= 100; i++) adapter.nodeChanges([{ id, type: "position", position: { x: 80 + i, y: 80 + i }, dragging: true }]);
+  assert.equal(updates, 0);
+  assert.deepEqual(model.list()[0].position, { x: 80, y: 80 });
+  assert.deepEqual(adapter.getSnapshot().nodes[0].position, { x: 180, y: 180 });
+  adapter.finishGesture(id);
+  assert.equal(updates, 1);
+  adapter.undo();
+  assert.deepEqual(model.list()[0].position, { x: 80, y: 80 });
+  assert.equal(model.list().length, 1);
+  adapter.destroy(); doc.destroy();
+});
+
+test("React Flow resize commits bounds atomically and preserves concurrent text and color", () => {
+  const { first, second, sync, close } = clients();
+  const adapter = createFlowchartAdapter(first);
+  try {
+    const id = first.add("process", { x: 100, y: 100 })!; sync();
+    adapter.setReadOnly(false); adapter.beginGesture(id, "resize");
+    adapter.nodeChanges([{ id, type: "position", position: { x: 60, y: 70 } }, { id, type: "dimensions", resizing: true, dimensions: { width: 240, height: 120 } }]);
+    second.edit(id, "text", "Remote title"); second.edit(id, "color", "rose"); sync();
+    adapter.finishGesture(id); sync();
+    assert.deepEqual(first.list()[0].position, { x: 60, y: 70 });
+    assert.deepEqual(first.list()[0].size, { width: 240, height: 120 });
+    adapter.undo(); sync();
+    assert.deepEqual(first.list()[0].position, { x: 100, y: 100 });
+    assert.deepEqual(first.list()[0].size, { width: 200, height: 90 });
+    assert.equal(first.list()[0].text, "Remote title"); assert.equal(first.list()[0].color, "rose");
+  } finally { adapter.destroy(); close(); }
+});
+
+test("React Flow bottom-right resize preserves an independent remote move", () => {
+  const { first, second, sync, close } = clients();
+  const adapter = createFlowchartAdapter(first);
+  try {
+    const id = first.add("process", { x: 100, y: 100 })!; sync();
+    adapter.setReadOnly(false); adapter.beginGesture(id, "resize");
+    adapter.nodeChanges([{ id, type: "dimensions", resizing: true, dimensions: { width: 300, height: 150 } }]);
+    second.move(id, { x: 600, y: 400 }); sync();
+    adapter.finishGesture(id); sync();
+    assert.deepEqual(first.list()[0].position, { x: 600, y: 400 });
+    assert.deepEqual(first.list()[0].size, { width: 300, height: 150 });
+  } finally { adapter.destroy(); close(); }
+});
+
+test("React Flow read-only changes cancel pending gestures and guard every mutation", () => {
+  const doc = new Y.Doc(), model = createFlowchartModel(doc), adapter = createFlowchartAdapter(model);
+  const first = model.add("process")!, second = model.add("terminal")!;
+  const edge = model.connect(first, second)!;
+  adapter.setReadOnly(false); adapter.selectNode(first); adapter.togglePicking();
+  adapter.beginGesture(first, "drag");
+  adapter.nodeChanges([{ id: first, type: "position", position: { x: 400, y: 400 } }]);
+  adapter.setReadOnly(true);
+  const before = Y.encodeStateAsUpdate(doc);
+  adapter.finishGesture(first);
+  adapter.edit(first, "text", "Denied"); adapter.label(edge, "Denied");
+  adapter.add("decision", { x: 100, y: 100 }); adapter.remove(first); adapter.disconnect(edge);
+  adapter.move(first, { x: 300, y: 300 }); adapter.resize(first, { width: 300, height: 300 }); adapter.front(first);
+  adapter.connect(second, first); adapter.undo(); adapter.redo(); adapter.togglePicking();
+  assert.deepEqual(Y.encodeStateAsUpdate(doc), before);
+  assert.equal(adapter.getSnapshot().picking, false);
+  assert.equal(adapter.preview(), undefined);
+  assert.deepEqual(adapter.getSnapshot().nodes[0].position, model.list()[0].position);
+  adapter.destroy(); doc.destroy();
+});

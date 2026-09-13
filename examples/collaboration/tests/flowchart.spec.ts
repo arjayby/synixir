@@ -10,7 +10,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   return { user, roomId, url: `${baseURL}/flowchart.html?room=${roomId}` };
 }
 const saved = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
-const node = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
+const node = (page: Page, name: string) => page.getByRole("group", { name, exact: true });
 const position = (locator: Locator) => locator.evaluate((element: Element) => {
   const t = new DOMMatrixReadOnly(getComputedStyle(element).transform);
   return { x: t.m41, y: t.m42 };
@@ -28,7 +28,7 @@ async function connect(page: Page, from: string, to: string, label: string) {
   await saved(page);
 }
 
-test("flowchart shares branches, smooth drags, cursors, selections, and local undo", async ({ page, context, baseURL }) => {
+test("flowchart shares branches, smooth drags, cursors, selections, and local undo", async ({ page, context, baseURL }, testInfo) => {
   const { user, url } = await setup(page, baseURL);
   await page.goto(url); await saved(page);
   await add(page, "terminal", "Request");
@@ -60,6 +60,7 @@ test("flowchart shares branches, smooth drags, cursors, selections, and local un
   await expect.poll(() => position(node(peer, "Decision: Approved?"))).toEqual({ x: before.x + 80, y: before.y + 60 });
   await peer.close();
   await expect(page.locator(".remote-cursor")).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("flowchart-desktop.png"), fullPage: true });
 });
 
 test("flowchart supports canvas connections, branch labels, node deletion and atomic undo", async ({ page, baseURL }) => {
@@ -111,7 +112,7 @@ test("flowchart merges offline edits, restores nodes and arrows after restart, a
   await expect(fresh.locator(".whiteboard-object")).toHaveCount(0);
 });
 
-test("flowchart respects viewer permissions and live downgrades on mobile", async ({ page, browser, baseURL }) => {
+test("flowchart respects viewer permissions and live downgrades on mobile", async ({ page, browser, baseURL }, testInfo) => {
   const { roomId, url } = await setup(page, baseURL); await page.goto(url); await saved(page);
   await add(page, "process", "Draft"); await add(page, "terminal", "Done");
   await connect(page, "Process: Draft", "Done", "Review");
@@ -132,6 +133,7 @@ test("flowchart respects viewer permissions and live downgrades on mobile", asyn
     await expect(viewer.getByLabel("Connection label", { exact: true })).not.toBeEditable();
     await expect(viewer.getByRole("button", { name: "Delete connection", exact: true })).toBeDisabled();
     expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await viewer.screenshot({ path: testInfo.outputPath("flowchart-mobile.png"), fullPage: true });
     await role("editor"); await viewer.reload(); await saved(viewer);
     await node(viewer, "Process: Draft").click();
     await viewer.getByRole("button", { name: "Pick on canvas" }).click();
@@ -177,4 +179,91 @@ test("flowchart arrows stay attached on every interpolated drag frame and revers
     const point = path.getPointAtLength(path.getTotalLength() / 2); return { x: point.x, y: point.y };
   }));
   expect(Math.hypot(curves[0].x - curves[1].x, curves[0].y - curves[1].y)).toBeGreaterThan(50);
+});
+
+test("React Flow handles connect nodes, resize once per gesture, and pan without writing the document", async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL); await page.goto(url); await saved(page);
+  await add(page, "process", "Draft"); await add(page, "terminal", "Done");
+  const draft = node(page, "Process: Draft"), done = node(page, "Start / End: Done");
+  await draft.scrollIntoViewIfNeeded();
+  const out = await draft.locator('.react-flow__handle.source').boundingBox();
+  const into = await done.locator('.react-flow__handle.target').boundingBox();
+  if (!out || !into) throw new Error("Connection handles must be visible");
+  await page.mouse.move(out.x + out.width / 2, out.y + out.height / 2); await page.mouse.down();
+  await page.mouse.move(into.x + into.width / 2, into.y + into.height / 2, { steps: 8 }); await page.mouse.up();
+  await expect(page.locator('.flow-edge')).toHaveCount(1);
+  await page.getByLabel("Connection label", { exact: true }).fill("Ready"); await saved(page);
+  const peer = await context.newPage(); await peer.goto(url); await saved(peer);
+  await expect(peer.locator('.flow-edge-label')).toHaveText("Ready");
+  await draft.click();
+  const id = (await draft.getAttribute('data-id'))!;
+  const size = () => draft.evaluate(element => ({ width: (element as HTMLElement).offsetWidth, height: (element as HTMLElement).offsetHeight }));
+  const originalSize = await size();
+  const handle = await draft.locator('.react-flow__resize-control.handle.bottom.right').boundingBox();
+  if (!handle) throw new Error("Selected node must have a resize handle");
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 40, handle.y + handle.height / 2 + 30, { steps: 8 });
+  await expect.poll(size).toEqual({ width: originalSize.width + 40, height: originalSize.height + 30 });
+  const durableSize = await page.evaluate(id => window.synixirTest.room!.doc.getMap<import("yjs").Map<unknown>>("flowchart:nodes:v1").get(id)!.get("size"), id);
+  expect(durableSize).toEqual(originalSize);
+  await page.mouse.up(); await saved(page);
+  await expect.poll(() => node(peer, "Process: Draft").evaluate(element => (element as HTMLElement).offsetWidth)).toBe(originalSize.width + 40);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(size).toEqual(originalSize);
+  await expect(peer.locator('.flow-edge-label')).toHaveText("Ready");
+  const beforeDocument = await page.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()));
+  const beforePan = await page.locator('.react-flow__viewport').getAttribute('style');
+  await page.locator('#whiteboard-viewport').scrollIntoViewIfNeeded();
+  const viewport = await page.locator('#whiteboard-viewport').boundingBox();
+  if (!viewport) throw new Error("Canvas must be visible");
+  await page.mouse.move(viewport.x + viewport.width - 80, viewport.y + 330); await page.mouse.down();
+  await page.mouse.move(viewport.x + viewport.width - 130, viewport.y + 280, { steps: 8 }); await page.mouse.up();
+  await expect(page.locator('.react-flow__viewport')).not.toHaveAttribute('style', beforePan!);
+  await page.getByLabel("Zoom out", { exact: true }).click();
+  await expect(page.getByLabel("Zoom level", { exact: true })).not.toHaveText("100%");
+  expect(await page.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(beforeDocument);
+  await peer.close();
+});
+
+for (const reducedMotion of [false, true]) test(`flowchart interpolates sparse remote cursor updates, reduced motion=${reducedMotion}`, async ({ page, context, baseURL }) => {
+  const { url } = await setup(page, baseURL);
+  await page.goto(url); await saved(page);
+  const peer = await context.newPage();
+  await peer.emulateMedia({ reducedMotion: reducedMotion ? "reduce" : "no-preference" });
+  await peer.goto(url); await saved(peer);
+  await page.locator('#whiteboard-viewport').scrollIntoViewIfNeeded();
+  const box = (await page.locator('#whiteboard-viewport').boundingBox())!;
+  await page.mouse.move(box.x + 250, box.y + 300);
+  await expect(peer.locator('.remote-cursor')).toBeVisible();
+  await expect.poll(async () => (await position(peer.locator('.remote-cursor'))).x).toBeCloseTo(250, 0);
+  const docBefore = await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()));
+  const samples = peer.evaluate(async () => {
+    const points: { x: number; time: number }[] = [];
+    let received: number | undefined;
+    const started = performance.now();
+    while (performance.now() - started < 300) {
+      await new Promise(requestAnimationFrame);
+      const time = performance.now();
+      const remote = [...window.synixirTest.room!.awareness.getStates()]
+        .find(([id]) => id !== window.synixirTest.room!.awareness.clientID)?.[1];
+      if (received === undefined && remote?.flowchart?.cursor?.x === 450) received = time;
+      const cursor = document.querySelector('.remote-cursor');
+      if (cursor) points.push({ x: new DOMMatrixReadOnly(getComputedStyle(cursor).transform).m41, time });
+    }
+    return { points, received };
+  });
+  await page.mouse.move(box.x + 450, box.y + 300);
+  const { points, received } = await samples;
+  const intermediate = new Set(points.filter(point => point.x > 250.5 && point.x < 449.5).map(point => Math.round(point.x * 10)));
+  if (reducedMotion) expect(intermediate.size).toBe(0);
+  else expect(intermediate.size, `Cursor must animate between awareness packets; sampled x=${JSON.stringify(points)}`).toBeGreaterThanOrEqual(2);
+  expect(points.at(-1)?.x).toBeCloseTo(450, 0);
+  expect(received).toBeDefined();
+  const settled = points.find(point => Math.abs(point.x - 450) < 0.5)!;
+  const delay = settled.time - received!;
+  expect(delay, "Cursor should settle promptly after the received update").toBeLessThan(150);
+  console.log(`flowchart cursor: ${intermediate.size} intermediate positions, ${Math.round(delay)}ms to settle, reduced motion=${reducedMotion}`);
+  expect(await peer.evaluate(() => JSON.stringify(window.synixirTest.room!.doc.toJSON()))).toBe(docBefore);
+  await page.mouse.move(box.x + 250, box.y - 20);
+  await expect(peer.locator('.remote-cursor')).toHaveCount(0);
 });
