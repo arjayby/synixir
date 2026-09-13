@@ -106,6 +106,8 @@ export function createRichText(room: SynixirRoom) {
     ],
     editorProps: { attributes: {
       "aria-label": "Rich text document", "aria-describedby": "editor-help", "aria-multiline": "true", role: "textbox", spellcheck: "true",
+      // Keep key events inside the editor when it becomes read-only.
+      tabindex: "0",
     } },
   });
 

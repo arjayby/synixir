@@ -145,6 +145,7 @@ test("rich text viewer and revoked editor cannot edit, format, or undo; mobile f
     await expect(document(viewer)).not.toBeEditable();
     await expect(viewer.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
     await selectAll(viewer);
+    await expect(document(viewer)).toBeFocused();
     await viewer.keyboard.press("ControlOrMeta+b");
     await viewer.keyboard.press("ControlOrMeta+z");
     await viewer.keyboard.type("cannot write");
