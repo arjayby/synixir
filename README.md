@@ -148,8 +148,9 @@ Create a room from **Your rooms**. Its creator becomes the first owner.
 3. Owners and editors can type, select, replace, undo, and redo their own changes.
    Viewers receive the document and presence but cannot edit. Their status reads
    **View only** rather than claiming that they saved changes.
-4. Disconnect an editor, make an offline edit, and reconnect. Wait for **Saved**
-   before closing the tab. Offline edits survive only while the tab remains open.
+4. Click the connection status in the footer and choose **Disconnect**. Make an
+   offline edit, then open the status dialog and choose **Connect**. Wait for
+   **Saved** before closing the tab. Offline edits survive only while the tab remains open.
 5. Restart Phoenix and open the same room to restore its saved state.
 6. Owners can change roles or remove members. Affected channels close and the
    example requires a reload to obtain current permissions. Copy any unsaved

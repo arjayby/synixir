@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { openRoom } from "./access-helpers.ts";
+import { changeConnection, openRoom } from "./access-helpers.ts";
 import { connected, documentText, expectText, insertAtStart } from "./editor-helpers.ts";
 
 test("dropdown shortcuts switch every example and preserve the current room", async ({ page, baseURL }, testInfo) => {
@@ -44,7 +44,7 @@ test("shortcuts respect editing, dialogs and the unsaved-draft warning", async (
   const url = `${baseURL}/?room=${roomId}`;
   await openRoom(page, url);
   await connected(page);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await insertAtStart(page, "Keep this draft");
 
   // Shortcut letters must still type normally in the editor.
@@ -75,6 +75,6 @@ test("shortcuts respect editing, dialogs and the unsaved-draft warning", async (
   await shortcut;
   await expect(page).toHaveURL(url);
   await expectText(page, draft);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await expect(page.locator("#save-status")).toHaveText("Saved");
 });

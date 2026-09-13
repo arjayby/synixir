@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Locator, Page } from "@playwright/test";
 
 const field = (page: Page, name: string) => page.getByRole("textbox", { name, exact: true });
@@ -50,7 +50,7 @@ test("form shares fields, field presence and local undo without replacing focuse
   await page.getByRole("checkbox", { name: "Website", exact: true }).check();
   await expect(peer.getByRole("checkbox", { name: "Website", exact: true })).toBeChecked();
   await expect(field(peer, "What are we making?")).toBeFocused();
-  await peer.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(peer, "Disconnect");
   await expect(page.locator("#people-goal")).toHaveText("");
   await saved(page);
 });
@@ -83,7 +83,7 @@ test("same-field offline edits and checkbox choices merge and persist after rest
   const peer = await context.newPage();
   await peer.goto(url);
   await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await field(page, "Project name").press("ControlOrMeta+a");
   await page.keyboard.press("ArrowLeft");
@@ -95,7 +95,7 @@ test("same-field offline edits and checkbox choices merge and persist after rest
   await peer.keyboard.insertText(" together");
   await peer.getByRole("checkbox", { name: "Email", exact: true }).check();
   await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await saved(page);
   await hasValue(page, "Project name", "Our Launch together");
   await hasValue(peer, "Project name", "Our Launch together");

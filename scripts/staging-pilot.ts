@@ -134,13 +134,15 @@ try {
     await saved(first);
     for (const page of [second, third]) await text(page, content);
 
-    await second.locator("#connection").click();
+    await second.getByRole("button", { name: "Connection status", exact: true }).click();
+    await second.getByRole("alertdialog").getByRole("button", { name: "Disconnect", exact: true }).click();
     await expect(second.locator("#status")).toHaveText("Disconnected");
     await second.getByRole("textbox", { name: "Shared document" }).click();
     await second.keyboard.press("ControlOrMeta+End");
     await second.keyboard.insertText(" offline");
     await text(first, content);
-    await second.locator("#connection").click();
+    await second.getByRole("button", { name: "Connection status", exact: true }).click();
+    await second.getByRole("alertdialog").getByRole("button", { name: "Connect", exact: true }).click();
     await expect(second.locator("#status")).toHaveText("Connected");
     await saved(second);
     for (const page of [first, second, third]) await text(page, content + " offline");

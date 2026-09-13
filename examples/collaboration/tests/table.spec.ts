@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Page } from "@playwright/test";
 
 async function setup(page: Page, baseURL: string|undefined) {
@@ -86,12 +86,12 @@ test("table merges disconnected edits to one cell and restores data and schema a
   const { url, roomId } = await setup(page, baseURL); await page.goto(url); await saved(page);
   await edit(page, "A1", "Plan: ");
   const peer = await context.newPage(); await peer.goto(url); await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await cell(page, "A1").dblclick(); await page.getByRole("textbox", { name: "Edit A1", exact: true }).press("End"); await page.keyboard.insertText("design ");
   await cell(peer, "A1").dblclick(); await peer.getByRole("textbox", { name: "Edit A1", exact: true }).press("End"); await peer.keyboard.insertText("build "); await peer.keyboard.press("Escape");
   await peer.getByRole("button", { name: "+ Add column", exact: true }).click();
   await peer.getByLabel("Column name", { exact: true }).fill("Notes"); await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click(); await saved(page);
+  await changeConnection(page, "Connect"); await saved(page);
   await expect(display(page, "A1")).toContainText("design"); await expect(display(page, "A1")).toContainText("build");
   const merged = (await display(page, "A1").textContent())!;
   await expect(display(peer, "A1")).toHaveText(merged);
@@ -168,7 +168,7 @@ test("empty table carets align with the placeholder and stay scoped to their cel
   await peer.keyboard.press("Escape"); await cell(peer, "B1").dblclick();
   await expect(cell(peer, "B1").locator(".cm-ySelectionCaret")).toHaveCount(0);
   await expect(cell(peer, "A1").locator(".cell-people")).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(peer.locator(".cell-people:not([hidden])")).toHaveCount(0);
 });
 

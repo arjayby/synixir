@@ -653,9 +653,6 @@ export function Workspace({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button id="connection" variant="ghost" size="xs" onClick={toggle}>
-            {connectionAction}
-          </Button>
         </div>
         <span className="playground-caption">Playground</span>
         <div className="footer-save">

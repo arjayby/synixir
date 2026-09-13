@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Page } from "@playwright/test";
 
 async function setup(page: Page, baseURL: string|undefined) {
@@ -67,7 +67,7 @@ test("offline changes converge and saved cards recover after a server crash", as
   await saved(peer);
   await addCard(page, "Review onboarding");
   await expect(card(peer, "Review onboarding")).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await card(page, "Review onboarding").click();
   await page.getByLabel("Status", { exact: true }).selectOption("done");
@@ -77,7 +77,7 @@ test("offline changes converge and saved cards recover after a server crash", as
   await peer.getByLabel("Description").fill("Teammate edited while you were offline.");
   await peer.getByRole("button", { name: "Close card", exact: true }).click();
   await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await saved(page);
   await expect(peer.locator('[data-column="done"]')).toContainText("Review onboarding");
   await expect(card(page, "Review onboarding")).toContainText("Teammate edited while you were offline.");

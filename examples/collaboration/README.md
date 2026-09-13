@@ -16,7 +16,7 @@ server in `dev.ts` proxies `/api` and `/socket` to Phoenix at
 http://127.0.0.1:4000; set `SYNIXIR_ENDPOINT` to override it. The proxy preserves
 the browser's Origin header so Phoenix can enforce its origin allowlist.
 
-`app/` contains the eight routes. `components/example-app.tsx` manages accounts,
+`app/` contains the seven example routes. `components/example-app.tsx` manages accounts,
 room selection, and navigation. `components/workspace/workspace.tsx` owns each
 SDK connection and its subscriptions, permissions, presence, and teardown.
 The editor/canvas modules mount inside a React-owned host and release their
@@ -29,8 +29,9 @@ the example dropdown keeps the current room when switching examples. Click the
 room ID for room information, the full member roster with live online status,
 and a second tab for creating a room. The avatar group opens access management;
 only owners can grant, change, or remove access. The username menu contains
-theme switching and sign out. Connection details use a shadcn alert dialog in
-the footer, alongside save status and help.
+theme switching and sign out. Click the connection status in the footer to open
+a shadcn alert dialog with connection details and Connect, Disconnect, or Reload
+actions. Save status and help are on the other side of the footer.
 
 Switch examples with single letter keys: **E** for Text editor, **K** for Kanban,
 **W** for Whiteboard, **R** for Rich text, **F** for Form, **C** for Flowchart,

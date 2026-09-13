@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register, password } from "./access-helpers.ts";
+import { changeConnection, api, register, password } from "./access-helpers.ts";
 import { connected, editor, expectText, insertAtStart } from "./editor-helpers.ts";
 import { Page } from "@playwright/test";
 
@@ -47,7 +47,7 @@ test("owners manage private rooms and viewers cannot edit", async ({ page, brows
     await expectText(reader, "Owner's saved text");
     await page.getByLabel(`Role for ${viewer.username}`).selectOption("editor");
     await expect(reader.locator("#status")).toContainText("Access changed");
-    await reader.getByRole("button", { name: "Reload", exact: true }).click();
+    await changeConnection(reader, "Reload");
     await connected(reader);
     await insertAtStart(reader, "Editor: ");
     await expect(reader.locator("#save-status")).toHaveText("Saved");
@@ -110,11 +110,11 @@ test("a role changed while disconnected preserves the draft until a fresh read-o
     const client = await memberContext.newPage();
     await client.goto(`${baseURL}/?room=${room}`);
     await connected(client);
-    await client.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await changeConnection(client, "Disconnect");
     await insertAtStart(client, "Offline draft: ");
     await expect(client.locator("#save-status")).toHaveText("Unsaved changes");
     expect((await api(context.request, baseURL, path, "PUT", { role: "viewer" })).ok()).toBe(true);
-    await client.getByRole("button", { name: "Connect", exact: true }).click();
+    await changeConnection(client, "Connect");
     await expect(client.locator("#status")).toContainText("Access changed");
     await expectText(client, "Offline draft: Saved document");
     await editor(client).click();
@@ -125,7 +125,7 @@ test("a role changed while disconnected preserves the draft until a fresh read-o
     await client.keyboard.press("ControlOrMeta+Shift+Z");
     await expectText(client, "Offline draft: Saved document");
     client.once("dialog", dialog => dialog.accept());
-    await client.getByRole("button", { name: "Reload", exact: true }).click();
+    await changeConnection(client, "Reload");
     await connected(client);
     await expect(client.locator("#save-status")).toHaveText("View only");
     await expectText(client, "Saved document");
@@ -148,12 +148,12 @@ test("reconnecting after a cookie account switch cannot upload the old account's
     const client = await memberContext.newPage();
     await client.goto(`${baseURL}/?room=${room}`);
     await connected(client);
-    await client.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await changeConnection(client, "Disconnect");
     await insertAtStart(client, "First account's private draft: ");
     // Switch cookies through the API, without this page receiving a storage event.
     const second = await register(memberContext.request, baseURL);
     expect((await api(context.request, baseURL, `/api/rooms/${room}/members/${second.username}`, "PUT", { role: "editor" })).ok()).toBe(true);
-    await client.getByRole("button", { name: "Connect", exact: true }).click();
+    await changeConnection(client, "Connect");
     await expect(client.locator("#account-name")).toHaveText(second.username);
     await connected(client);
     await expectText(client, "Shared saved document");

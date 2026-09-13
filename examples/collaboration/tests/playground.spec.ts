@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { connected, insertAtStart } from "./editor-helpers.ts";
 
 test("playground menus, room tabs, connection alerts and save help work together", async ({
@@ -21,6 +21,7 @@ test("playground menus, room tabs, connection alerts and save help work together
   await page.getByLabel("New room ID").fill(roomId);
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   await connected(page);
+  await expect(page.locator(".footer-connection button")).toHaveCount(1);
   await insertAtStart(page, "A shared playground draft");
   await expect(page.locator("#save-status")).toHaveText("Saved");
 
@@ -35,6 +36,7 @@ test("playground menus, room tabs, connection alerts and save help work together
   await alert.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(alert).toBeHidden();
   await expect(page.locator("#status")).toHaveText("Disconnected");
+  await expect(page.locator(".footer-connection button")).toHaveCount(1);
   await insertAtStart(page, "Offline edit. ");
   await page
     .getByRole("button", { name: "Save status and help", exact: true })
@@ -43,7 +45,7 @@ test("playground menus, room tabs, connection alerts and save help work together
     "Offline edits stay in this tab until you reconnect.",
   );
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await connected(page);
   await expect(page.locator("#save-status")).toHaveText("Saved");
 

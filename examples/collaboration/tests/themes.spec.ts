@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { drawShape, scene } from "./whiteboard-helpers.ts";
 
 test.use({ viewport: { width: 1440, height: 1000 }, colorScheme: "dark" });
@@ -99,7 +99,7 @@ for (const example of examples) test(`${example.name} follows the playground the
   await expect(page.locator("#save-status")).toHaveText("Saved");
   await populate(page, example.name);
   if (example.name === "text") {
-    await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await changeConnection(page, "Disconnect");
     await page.getByRole("textbox", { name: "Shared document", exact: true }).press("ControlOrMeta+End");
     await page.keyboard.insertText(" Keep this unsaved draft.");
     await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
@@ -155,7 +155,7 @@ for (const example of examples) test(`${example.name} follows the playground the
   }
 
   if (example.name === "text") {
-    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await changeConnection(page, "Connect");
     await expect(page.locator("#save-status")).toHaveText("Saved");
   }
   // Saved preferences must reach lazily mounted editors even when the OS disagrees.

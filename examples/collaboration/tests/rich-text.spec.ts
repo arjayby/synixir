@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { Page } from "@playwright/test";
 
 const document = (page: Page) => page.getByRole("textbox", { name: "Rich text document", exact: true });
@@ -65,7 +65,7 @@ test("rich text merges disconnected edits and restores formatted content after r
   const peer = await context.newPage();
   await peer.goto(url);
   await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await selectAll(page);
   await page.keyboard.press("ArrowLeft");
@@ -77,7 +77,7 @@ test("rich text merges disconnected edits and restores formatted content after r
   await selectAll(peer);
   await peer.getByRole("button", { name: "Bold", exact: true }).click();
   await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await changeConnection(page, "Connect");
   await saved(page);
   await expect(document(page)).toContainText("Offline: Shared sentence together.");
   await expect(document(peer)).toContainText("Offline: Shared sentence together.");

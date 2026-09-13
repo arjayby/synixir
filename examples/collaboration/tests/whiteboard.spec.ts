@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures.ts";
-import { api, register } from "./access-helpers.ts";
+import { changeConnection, api, register } from "./access-helpers.ts";
 import { canvas, drawShape, elementPoint, savedWhiteboard as saved, scene, selectShape, setupWhiteboard as setup } from "./whiteboard-helpers.ts";
 
 test.setTimeout(90_000);
@@ -64,12 +64,12 @@ test("Excalidraw merges offline edits and restores saved scenes after a backend 
   await page.goto(url); await saved(page);
   const element = await drawShape(page);
   const peer = await context.newPage(); await peer.goto(url); await saved(peer);
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await changeConnection(page, "Disconnect");
   await expect(page.locator("#status")).toHaveText("Disconnected");
   await selectShape(page, element.id); await page.keyboard.press("Shift+ArrowRight");
   await expect(page.locator("#save-status")).toHaveText("Unsaved changes");
   await selectShape(peer, element.id); await peer.getByTestId("strokeWidth-bold").locator("..").click(); await saved(peer);
-  await page.getByRole("button", { name: "Connect", exact: true }).click(); await saved(page);
+  await changeConnection(page, "Connect"); await saved(page);
   await expect.poll(async () => ({ x: (await scene(page))[0].x, stroke: (await scene(page))[0].strokeWidth }))
     .toEqual({ x: element.x + 5, stroke: 2 });
   await page.close(); await peer.close(); await backend.restart();
