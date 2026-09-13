@@ -3,6 +3,13 @@ defmodule SynixirWeb.ClientControllerTest do
 
   for {route, file} <- [
         {"/", "index.html"},
+        {"/sdk", "sdk.html"},
+        {"/kanban", "kanban.html"},
+        {"/whiteboard", "whiteboard.html"},
+        {"/rich-text", "rich-text.html"},
+        {"/multiplayer-form", "multiplayer-form.html"},
+        {"/flowchart", "flowchart.html"},
+        {"/table", "table.html"},
         {"/sdk.html", "sdk.html"},
         {"/kanban.html", "kanban.html"},
         {"/whiteboard.html", "whiteboard.html"},

@@ -19,7 +19,7 @@ export const examples = [
   },
   {
     id: "kanban",
-    path: "/kanban.html",
+    path: "/kanban",
     title: "Kanban board",
     description: "Move work forward with your whole team.",
     icon: Columns3,
@@ -27,7 +27,7 @@ export const examples = [
   },
   {
     id: "whiteboard",
-    path: "/whiteboard.html",
+    path: "/whiteboard",
     title: "Whiteboard",
     description: "A shared canvas for your next idea.",
     icon: PencilRuler,
@@ -35,7 +35,7 @@ export const examples = [
   },
   {
     id: "rich-text",
-    path: "/rich-text.html",
+    path: "/rich-text",
     title: "Rich text",
     description: "Turn a rough outline into something worth sharing.",
     icon: Type,
@@ -43,7 +43,7 @@ export const examples = [
   },
   {
     id: "multiplayer-form",
-    path: "/multiplayer-form.html",
+    path: "/multiplayer-form",
     title: "Project brief",
     description: "Work through the details, together.",
     icon: ListChecks,
@@ -51,7 +51,7 @@ export const examples = [
   },
   {
     id: "flowchart",
-    path: "/flowchart.html",
+    path: "/flowchart",
     title: "Flowchart",
     description: "Connect the dots in your team's thinking.",
     icon: Workflow,
@@ -59,7 +59,7 @@ export const examples = [
   },
   {
     id: "table",
-    path: "/table.html",
+    path: "/table",
     title: "Table",
     description: "Give your team's information a shared home.",
     icon: Table2,
@@ -67,7 +67,7 @@ export const examples = [
   },
   {
     id: "sdk",
-    path: "/sdk.html",
+    path: "/sdk",
     title: "Shared settings",
     description: "One small setting. Every client in sync.",
     icon: SlidersHorizontal,

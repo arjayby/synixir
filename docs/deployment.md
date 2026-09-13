@@ -20,8 +20,8 @@ elixir scripts/staging.exs up
 elixir scripts/staging.exs status
 ```
 
-Open [local staging](https://localhost:8443) and create an account. The SDK settings
-example is at [sdk.html](https://localhost:8443/sdk.html). The generated certificate
+Open [local staging](https://localhost:8443) and create an account, then try the
+[SDK settings example](https://localhost:8443/sdk). The generated certificate
 is self-signed, so a browser requires a local certificate exception. The pilot
 accepts this certificate only in its browser contexts. It does not install a
 system trust root. For a verified command-line request:

@@ -183,16 +183,16 @@ transfers, and save tracking; account forms and editor controls stay in the app.
 
 See the [SDK interface and integration guide](packages/client/README.md) for
 installation, connection and save states, cancellation, cleanup, and custom
-access callbacks. `/sdk.html?room=<room_id>` provides a second small consumer
+access callbacks. `/sdk?room=<room_id>` provides a second small consumer
 that synchronizes a title in a Y.Map without CodeMirror. It uses the same signed-in
 account and room membership as the editor.
 
 ## Try the Kanban example
 
-Open [127.0.0.1:5173/kanban.html](http://127.0.0.1:5173/kanban.html) with the same
+Open [127.0.0.1:5173/kanban](http://127.0.0.1:5173/kanban) with the same
 development servers running. Sign in and create a board, or open an existing room.
 The text editor and board link to each other and share account and room access.
-The production build also includes `/kanban.html`.
+The production build also includes `/kanban`.
 
 - Add cards to Backlog, In progress, or Done. Open a card to edit its title,
   description, color, and status. Changes save as you type.
@@ -234,7 +234,7 @@ npm test --workspace synixir-collaboration-example -- kanban.spec.ts
 
 ## Try the whiteboard example
 
-Open [127.0.0.1:5173/whiteboard.html](http://127.0.0.1:5173/whiteboard.html) with the
+Open [127.0.0.1:5173/whiteboard](http://127.0.0.1:5173/whiteboard) with the
 same development servers running. Sign in and create a room, or open an existing
 one. Links between the examples retain the room.
 Each example stores its data separately inside that room's Yjs document.
@@ -263,7 +263,7 @@ migration updates. See the [Excalidraw integration notes](examples/collaboration
 for the scene model, asset setup, and package constraints.
 
 Offline edits remain in the open tab until reconnecting. Wait for **Saved** before
-closing it. The production build includes `/whiteboard.html` and uses the same
+closing it. The production build includes `/whiteboard` and uses the same
 room permissions, PostgreSQL persistence, and recovery flow as the other examples.
 
 `npm test` includes whiteboard concurrency and undo checks. Run its browser
@@ -275,7 +275,7 @@ npm test --workspace synixir-collaboration-example -- whiteboard.spec.ts
 
 ## Try the rich-text example
 
-Open [127.0.0.1:5173/rich-text.html](http://127.0.0.1:5173/rich-text.html) with the
+Open [127.0.0.1:5173/rich-text](http://127.0.0.1:5173/rich-text) with the
 same development servers running. Sign in and create a room, or open an existing
 one. The plain-text editor remains available as its own example.
 
@@ -310,7 +310,7 @@ npm test --workspace synixir-collaboration-example -- rich-text.spec.ts
 
 ## Try the multiplayer form example
 
-Open [127.0.0.1:5173/multiplayer-form.html](http://127.0.0.1:5173/multiplayer-form.html)
+Open [127.0.0.1:5173/multiplayer-form](http://127.0.0.1:5173/multiplayer-form)
 with the same development servers running. Create a room or open an existing one,
 then open the form in another tab to collaborate on a project brief.
 
@@ -352,7 +352,7 @@ npm test --workspace synixir-collaboration-example -- multiplayer-form.spec.ts
 
 ## Try the flowchart builder
 
-Open [127.0.0.1:5173/flowchart.html](http://127.0.0.1:5173/flowchart.html) with the
+Open [127.0.0.1:5173/flowchart](http://127.0.0.1:5173/flowchart) with the
 same development servers running. Create a room or use an existing one, then open
 another tab to build a workflow together.
 
@@ -396,7 +396,7 @@ npm test --workspace synixir-collaboration-example -- flowchart.spec.ts
 
 ## Try the collaborative table
 
-Open [127.0.0.1:5173/table.html](http://127.0.0.1:5173/table.html) with the same
+Open [127.0.0.1:5173/table](http://127.0.0.1:5173/table) with the same
 development servers running. Create a room or use an existing one, then open
 another tab to work on the same table.
 

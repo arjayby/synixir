@@ -4,9 +4,9 @@ import { api, register } from "./access-helpers.ts";
 
 for (const [path, name] of [
   ["/", "Shared document"],
-  ["/multiplayer-form.html", "Project name"],
-  ["/multiplayer-form.html", "What are we making?"],
-  ["/multiplayer-form.html", "Who is it for?"],
+  ["/multiplayer-form", "Project name"],
+  ["/multiplayer-form", "What are we making?"],
+  ["/multiplayer-form", "Who is it for?"],
 ]) test(`empty ${name} shows remote cursor at the start of its placeholder`, async ({ page, context, baseURL }) => {
   await register(page.request, baseURL);
   const room = `placeholder-${randomUUID()}`;
@@ -46,7 +46,7 @@ test("empty rich text keeps its remote caret at the paragraph start", async ({ p
   await register(page.request, baseURL);
   const room = `rich-placeholder-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: room })).ok()).toBe(true);
-  const url = `${baseURL}/rich-text.html?room=${room}`;
+  const url = `${baseURL}/rich-text?room=${room}`;
   await page.goto(url);
   await expect(page.locator("#save-status")).toHaveText("Saved");
   const source = page.getByRole("textbox", { name: "Rich text document", exact: true });

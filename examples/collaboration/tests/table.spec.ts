@@ -7,7 +7,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `table-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/table.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/table?room=${roomId}` };
 }
 const saved = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
 const cell = (page: Page, address: string) => page.getByRole("gridcell", { name: new RegExp(`^${address}:`) });
@@ -101,7 +101,7 @@ test("table merges disconnected edits to one cell and restores data and schema a
   await expect(fresh.getByRole("columnheader", { name: "E · Notes", exact: true })).toBeVisible();
   await fresh.getByRole("button", { name: "Select example", exact: true }).click();
   await fresh.getByRole("menuitem", { name: "Project brief", exact: true }).click();
-  await expect(fresh).toHaveURL(`${baseURL}/multiplayer-form.html?room=${roomId}`); await saved(fresh);
+  await expect(fresh).toHaveURL(`${baseURL}/multiplayer-form?room=${roomId}`); await saved(fresh);
   await expect(fresh.getByRole("textbox", { name: "Project name", exact: true }).locator(".cm-placeholder")).toBeVisible();
 });
 

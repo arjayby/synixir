@@ -6,7 +6,7 @@ export async function setupWhiteboard(page: Page, baseURL: string | undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `whiteboard-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/whiteboard.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/whiteboard?room=${roomId}` };
 }
 export const savedWhiteboard = (page: Page) => expect(page.locator("#save-status")).toHaveText("Saved");
 export const scene = (page: Page) => page.evaluate(() => window.synixirWhiteboardTest!.getSceneElements());

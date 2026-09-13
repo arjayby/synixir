@@ -15,7 +15,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `rich-text-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  const url = `${baseURL}/rich-text.html?room=${roomId}`;
+  const url = `${baseURL}/rich-text?room=${roomId}`;
   await page.goto(url);
   await saved(page);
   return { user, roomId, url };

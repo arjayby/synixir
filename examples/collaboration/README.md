@@ -60,10 +60,10 @@ npm run build
 
 The build compiles the SDK to `packages/client/dist` and exports Next.js pages
 and assets to `examples/collaboration/out`. Docker copies this export into
-Phoenix's `priv/static`; the runtime needs no Node process. Existing public
-URLs such as `/kanban.html?room=planning` and `/sdk.html?room=planning` are
-preserved in development and production. Navigation uses full page loads to
-retain the unsaved-edit warning and tear down old room connections.
+Phoenix's `priv/static`; the runtime needs no Node process. Navigation uses
+URLs such as `/kanban?room=planning` and `/sdk?room=planning` in development and
+production. Previously shared `.html` links also work. Navigation uses full page
+loads to retain the unsaved-edit warning and tear down old room connections.
 
 Browser tests run on ports 5174 and 4010 with a separate Phoenix test database.
 They use `.next-browser-test` so an existing development server can stay open.

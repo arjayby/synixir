@@ -8,7 +8,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const roomId = `sdk-${randomUUID()}`;
   const response = await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId });
   expect(response.ok()).toBe(true);
-  return { user, roomId, url: `${baseURL}/sdk.html?room=${roomId}` };
+  return { user, roomId, url: `${baseURL}/sdk?room=${roomId}` };
 }
 const saved = (page: Page) => expect(page.locator("#sdk-state")).toHaveText("connected · saved");
 

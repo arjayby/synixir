@@ -53,7 +53,7 @@ test("playground menus, room tabs, connection alerts and save help work together
   await expect(page.getByRole("menuitem")).toHaveCount(8);
   await expect(
     page.getByRole("menuitem", { name: "Kanban board", exact: true }),
-  ).toHaveAttribute("href", `/kanban.html?room=${roomId}`);
+  ).toHaveAttribute("href", `/kanban?room=${roomId}`);
   await page
     .getByRole("menuitem", { name: "Kanban board", exact: true })
     .click();

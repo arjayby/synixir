@@ -15,7 +15,7 @@ async function setup(page: Page, baseURL: string|undefined) {
   const user = await register(page.request, baseURL);
   const roomId = `form-${randomUUID()}`;
   expect((await api(page.request, baseURL, "/api/rooms", "POST", { room_id: roomId })).ok()).toBe(true);
-  const url = `${baseURL}/multiplayer-form.html?room=${roomId}`;
+  const url = `${baseURL}/multiplayer-form?room=${roomId}`;
   await page.goto(url);
   await saved(page);
   return { user, roomId, url };
