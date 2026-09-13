@@ -4,7 +4,8 @@ This app uses TypeScript, React, Next.js App Router, shadcn/ui (Radix), and
 Tailwind CSS. Elixir/Phoenix owns accounts, room permissions, WebSockets, and
 PostgreSQL persistence. The browser consumes `@synixir/client`.
 
-From the repository root, start Phoenix as described in the main README, then:
+From the repository root, start Phoenix with the
+[local setup guide](../../docs/development.md#local-setup), then:
 
 ```sh
 npm ci
