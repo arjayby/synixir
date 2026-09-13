@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Check, ChevronDown, LogOut, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,6 +80,42 @@ export function PlaygroundHeader({
   accountMenu: ReactNode;
 }) {
   const selected = example(kind);
+  const roomSearch = roomId ? `?room=${encodeURIComponent(roomId)}` : "";
+
+  useEffect(() => {
+    function switchExample(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.altKey ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey
+      ) return;
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        ((target instanceof HTMLElement && target.isContentEditable) ||
+          target.closest(
+            '#editor, input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"]',
+          ))
+      ) return;
+      if (
+        document.querySelector('[role="dialog"], [role="alertdialog"], dialog[open]')
+      ) return;
+
+      const item = examples.find((item) => event.key.toLowerCase() === item.shortcut);
+      if (!item) return;
+      event.preventDefault();
+      if (item.id !== kind) window.location.assign(item.path + roomSearch);
+    }
+
+    window.addEventListener("keydown", switchExample);
+    return () => window.removeEventListener("keydown", switchExample);
+  }, [kind, roomSearch]);
+
   return (
     <header className="playground-header">
       <nav className="playground-location" aria-label="Playground navigation">
@@ -96,15 +133,16 @@ export function PlaygroundHeader({
               {examples.map((item) => (
                 <DropdownMenuItem asChild key={item.id}>
                   <a
-                    href={
-                      item.path +
-                      (roomId ? `?room=${encodeURIComponent(roomId)}` : "")
-                    }
+                    href={item.path + roomSearch}
                     aria-current={kind === item.id ? "page" : undefined}
+                    aria-keyshortcuts={item.shortcut}
                   >
                     <item.icon />
                     {item.title}
-                    {kind === item.id ? <Check className="ml-auto" /> : null}
+                    {kind === item.id ? <Check aria-hidden="true" /> : null}
+                    <Kbd className="ml-auto" aria-hidden="true">
+                      {item.shortcut.toUpperCase()}
+                    </Kbd>
                   </a>
                 </DropdownMenuItem>
               ))}

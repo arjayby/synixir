@@ -32,6 +32,13 @@ only owners can grant, change, or remove access. The username menu contains
 theme switching and sign out. Connection details use a shadcn alert dialog in
 the footer, alongside save status and help.
 
+Switch examples with single letter keys: **E** for Text editor, **K** for Kanban,
+**W** for Whiteboard, **R** for Rich text, **F** for Form, **C** for Flowchart,
+and **T** for Table.
+Each option shows its key with a shadcn Kbd component. These shortcuts work
+outside text fields, editors, and dialogs, retain the current room, and keep
+the warning before leaving with unsaved edits.
+
 ## Libraries by example
 
 | Example | UI and editing packages | Shared data |
