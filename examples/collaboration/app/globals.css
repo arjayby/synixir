@@ -95,6 +95,7 @@
     --accent: oklch(0.8778 0.1383 86.1920);
     --accent-foreground: oklch(0.2931 0 0);
     --destructive: oklch(0.5904 0.2000 26.1033);
+    --status-connected: oklch(0.627 0.194 149.214);
     --border: oklch(0.9193 0.0099 87.4740);
     --input: oklch(0.9193 0.0099 87.4740);
     --ring: oklch(0.8778 0.1383 86.1920);
@@ -151,6 +152,7 @@
     --accent: oklch(0.7007 0.1304 84.6350);
     --accent-foreground: oklch(1.0000 0 0);
     --destructive: oklch(0.6091 0.1931 24.9679);
+    --status-connected: oklch(0.723 0.219 149.579);
     --border: oklch(0.3001 0.0053 106.7146);
     --input: oklch(0.3001 0.0053 106.7146);
     --ring: oklch(0.7007 0.1304 84.6350);
@@ -232,6 +234,9 @@
 .playground-dialog { max-height: calc(100dvh - 48px); overflow-y: auto; }
 .member-presence { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); }
+.connection-dot { width: 8px; height: 8px; flex-shrink: 0; }
+.connection-dot[data-state="connected"] { background: var(--status-connected); }
+.connection-dot[data-state="disconnected"], .connection-dot[data-state="error"] { background: var(--destructive); }
 .member-presence[data-online="true"] .status-dot { background: var(--primary); }
 .playground-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; min-height: 56px; color: var(--muted-foreground); font-size: 12px; }
 .footer-connection { display: flex; align-items: center; gap: 6px; min-width: 0; }

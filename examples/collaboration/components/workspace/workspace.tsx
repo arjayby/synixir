@@ -19,8 +19,6 @@ import {
   Undo2,
   Redo2,
   Users,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -610,11 +608,11 @@ export function Workspace({
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="sm" aria-label="Connection status">
-                {online ? (
-                  <Wifi data-icon="inline-start" />
-                ) : (
-                  <WifiOff data-icon="inline-start" />
-                )}
+                <span
+                  className="status-dot connection-dot"
+                  data-state={state.connection}
+                  aria-hidden="true"
+                />
                 <span
                   id="status"
                   role="status"

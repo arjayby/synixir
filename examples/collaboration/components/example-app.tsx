@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUpRight, FolderPlus, WifiOff } from "lucide-react";
+import { ArrowUpRight, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -334,7 +334,11 @@ export function ExampleApp({ kind }: { kind: ExampleKind }) {
           </main>
           <footer className="playground-footer">
             <span className="footer-connection">
-              <WifiOff className="size-3.5" />
+              <span
+                className="status-dot connection-dot"
+                data-state="offline"
+                aria-hidden="true"
+              />
               Offline
             </span>
             <span className="playground-caption">Playground</span>
