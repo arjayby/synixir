@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: synixir-playground
+    name: synixir
     runtime: docker
     plan: free
     region: ohio
