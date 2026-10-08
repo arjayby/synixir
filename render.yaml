@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: synixir-playground
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Room ownership currently requires one node. Replace a stopped service
+    # rather than using Render's overlapping redeploy/restart flow.
+    numInstances: 1
+    autoDeployTrigger: "off"
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 40
+    # The free plan has no pre-deploy command. Migrate before starting HTTP.
+    dockerCommand: >-
+      /bin/sh -c 'export SYNIXIR_PUBLIC_URL="${SYNIXIR_PUBLIC_URL:-https://${RENDER_EXTERNAL_HOSTNAME}}";
+      /app/bin/synixir eval "Synixir.Release.native_check(); Synixir.Release.migrate()" &&
+      exec /app/bin/synixir start'
+    envVars:
+      - key: PHX_SERVER
+        value: "true"
+      - key: POOL_SIZE
+        value: "5"
+      - key: DATABASE_URL
+        sync: false
+      # Phoenix requires at least 64 characters; use mix phx.gen.secret.
+      - key: SECRET_KEY_BASE
+        sync: false

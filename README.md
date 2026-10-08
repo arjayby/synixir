@@ -85,6 +85,7 @@ access, editor integration, save states, and cleanup.
 - [Client SDK](packages/client/README.md): installation and integration examples.
 - [Playground](examples/collaboration/README.md): example libraries and frontend development.
 - [Local Docker staging](docs/deployment.md): HTTPS setup, release checks, and replacement.
+- [Public playground](docs/playground-deployment.md): Render setup, PostgreSQL, secrets, and deployment checks.
 - [Operations](docs/operations.md): quotas, health checks, metrics, alerts, and backup restoration.
 
 ## Current status
