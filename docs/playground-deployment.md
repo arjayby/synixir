@@ -7,7 +7,7 @@ document updates persist in PostgreSQL.
 ## Create the database
 
 For a free demo, create a [Neon Free project](https://neon.com/pricing). Choose a
-region near your Render service; `render.yaml` defaults to Singapore.
+region near your Render service; `render.yaml` defaults to Ohio.
 
 Copy the **direct**, non-pooled PostgreSQL connection URL from Neon's Connect
 dialog. Keep the username, password, hostname, and database, but replace its query

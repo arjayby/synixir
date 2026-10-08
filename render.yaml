@@ -3,7 +3,7 @@ services:
     name: synixir-playground
     runtime: docker
     plan: free
-    region: singapore
+    region: ohio
     dockerfilePath: ./Dockerfile
     dockerContext: .
     # Room ownership currently requires one node. Replace a stopped service
