@@ -66,6 +66,12 @@ quoting.
 
 ## Verify the playground
 
+Production builds include the Umami Cloud tracker in the shared layout for all
+seven examples. Page URLs exclude query parameters and fragments so room IDs
+are not recorded with page views. Development builds omit the tracker.
+After deployment, visit an example and check the site's Umami dashboard for the
+page view.
+
 Wait for the service to become healthy, then open its assigned `onrender.com` URL.
 Create an account and a room. Open that room in two tabs, edit the text, and
 confirm both tabs converge and show **Saved**. Check the other six examples from
