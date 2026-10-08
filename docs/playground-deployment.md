@@ -43,7 +43,8 @@ The Blueprint prompts for two environment variables:
 Keep these values in Render's environment settings. Retain the session secret
 across replacements so existing sessions remain valid.
 
-The startup command uses Render's `RENDER_EXTERNAL_HOSTNAME` to set the public
+The Blueprint's Docker Command is `/app/bin/render-start`, an executable script
+packaged in the image. It uses Render's `RENDER_EXTERNAL_HOSTNAME` to set the public
 HTTPS origin. For a custom domain, set `SYNIXIR_PUBLIC_URL` explicitly to that
 HTTPS origin before starting the service. This controls session redirects and
 the WebSocket origin allowlist.
@@ -54,6 +55,13 @@ separate pre-deploy command, so these checks run in the startup command instead.
 The readiness probe is `/health/ready`. See
 [Render's Docker guide](https://render.com/docs/docker) and
 [Blueprint reference](https://render.com/docs/blueprint-spec).
+
+If a previous deploy exited with status 127 and logged the entire `export ...`
+sequence as `not found`, update the service's **Settings → Docker Command** to
+`/app/bin/render-start` (or sync the updated Blueprint) and deploy an image built
+from this version of the repository. The old inline command was interpreted as
+a command name instead of a shell sequence. The new command avoids nested shell
+quoting.
 
 ## Verify the playground
 

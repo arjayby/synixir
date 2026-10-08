@@ -6,6 +6,8 @@
 !mix.lock
 !package.json
 !package-lock.json
+!scripts/
+!scripts/render-start.sh
 !config/
 !config/**
 !lib/

@@ -31,6 +31,7 @@ RUN apt-get update \
 ENV LANG=C.UTF-8 MIX_ENV=prod PHX_SERVER=true
 WORKDIR /app
 COPY --from=builder --chown=nobody:nogroup /app/_build/prod/rel/synixir/ ./
+COPY --chown=nobody:nogroup --chmod=755 scripts/render-start.sh ./bin/render-start
 COPY --chown=nobody:nogroup LICENSE LICENSING.md ./
 COPY --chown=nobody:nogroup packages/client/LICENSE packages/client/NOTICE ./licenses/client/
 COPY --chown=nobody:nogroup examples/collaboration/LICENSE examples/collaboration/NOTICE ./licenses/playground/

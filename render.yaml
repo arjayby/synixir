@@ -12,10 +12,7 @@ services:
     autoDeployTrigger: "off"
     healthCheckPath: /health/ready
     # The free plan has no pre-deploy command. Migrate before starting HTTP.
-    dockerCommand: >-
-      /bin/sh -c 'export SYNIXIR_PUBLIC_URL="${SYNIXIR_PUBLIC_URL:-https://${RENDER_EXTERNAL_HOSTNAME}}";
-      /app/bin/synixir eval "Synixir.Release.native_check(); Synixir.Release.migrate()" &&
-      exec /app/bin/synixir start'
+    dockerCommand: /app/bin/render-start
     envVars:
       - key: PHX_SERVER
         value: "true"
