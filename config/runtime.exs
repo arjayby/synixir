@@ -82,8 +82,16 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
+  # Postgrex uses :ssl, not libpq's sslmode query parameter. Hosted databases
+  # require TLS; keep local staging unchanged unless the URL requests it.
+  database_query = URI.decode_query(URI.parse(database_url).query || "")
+
+  database_ssl =
+    System.get_env("RENDER") == "true" or
+      database_query["sslmode"] in ["require", "verify-ca", "verify-full"]
+
   config :synixir, Synixir.Repo,
-    # ssl: true,
+    ssl: database_ssl,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     # For machines with several cores, consider starting multiple pools of `pool_size`

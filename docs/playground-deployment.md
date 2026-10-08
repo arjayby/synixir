@@ -10,17 +10,18 @@ For a free demo, create a [Neon Free project](https://neon.com/pricing). Choose 
 region near your Render service; `render.yaml` defaults to Ohio.
 
 Copy the **direct**, non-pooled PostgreSQL connection URL from Neon's Connect
-dialog. Keep the username, password, hostname, and database, but replace its query
-string with `?ssl=true` for Ecto/Postgrex, for example:
+dialog. Keep the username, password, hostname, database, and query parameters,
+for example:
 
 ```text
-postgresql://USER:PASSWORD@HOST/DATABASE?ssl=true
+postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 ```
 
-Postgrex uses certificate and hostname verification with `ssl=true`. The image
-includes system CA certificates. Do not use `sslmode=require` alone: Postgrex
-does not use libpq's connection options to enable TLS. Direct connections also
-avoid transaction-pooler restrictions on migration locks and prepared statements.
+The app enables Postgrex TLS automatically on Render (`RENDER=true`) and when
+the URL contains `sslmode=require`, `verify-ca`, or `verify-full`. Postgrex checks
+both the server certificate and hostname using the image's system CA certificates.
+Ecto's `?ssl=true` also works. Direct connections avoid transaction-pooler
+restrictions on migration locks and prepared statements.
 
 Render's own free PostgreSQL database expires after 30 days. Neon has storage,
 compute, and transfer limits; check its current free allowances before deploying.
@@ -37,7 +38,7 @@ The Blueprint prompts for two environment variables:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | The direct PostgreSQL URL with `?ssl=true` |
+| `DATABASE_URL` | The direct PostgreSQL URL from Neon |
 | `SECRET_KEY_BASE` | A new secret from `mix phx.gen.secret` (at least 64 characters) |
 
 Keep these values in Render's environment settings. Retain the session secret
