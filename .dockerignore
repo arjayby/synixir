@@ -26,12 +26,17 @@
 !examples/collaboration/**/
 !examples/collaboration/**/*.ts
 !examples/collaboration/**/*.tsx
+!examples/collaboration/**/*.mjs
 !examples/collaboration/**/*.css
 !examples/collaboration/components.json
 !examples/collaboration/tsconfig.json
 examples/collaboration/node_modules/
-examples/collaboration/.next/
+examples/collaboration/.next*/
+examples/collaboration/dist/
 examples/collaboration/out/
 examples/collaboration/test-results/
+examples/collaboration/playwright-report/
+examples/collaboration/public/excalidraw-assets/
+**/*.tsbuildinfo
 
 examples/collaboration/next-env.d.ts

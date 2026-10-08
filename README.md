@@ -31,6 +31,7 @@ require separate setup.
 |---|---|
 | [Client SDK](packages/client/README.md) | Installation, connection and save states, and integration examples |
 | [Local Docker staging](docs/deployment.md) | HTTPS setup, browser pilot, backups, replacement, and rollback |
+| [Public playground](docs/playground-deployment.md) | Render setup, PostgreSQL, secrets, and deployment checks |
 | [Operations](docs/operations.md) | Quotas, health checks, metrics, alert rules, and load results |
 
 ## Try local Docker staging
