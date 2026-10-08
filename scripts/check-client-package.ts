@@ -14,7 +14,13 @@ try {
   const [pack] = JSON.parse(run("npm", ["pack", "--workspace", "@synixir/client", "--json", "--pack-destination", temporary], root));
   assert.ok(pack.files.some((file: { path: string; }) => file.path === "dist/index.d.ts"));
   assert.ok(pack.files.some((file: { path: string; }) => file.path === "README.md"));
-  assert.ok(pack.files.every((file: { path: string; }) => /^(dist\/|README\.md$|package\.json$)/.test(file.path)));
+  assert.ok(pack.files.some((file: { path: string; }) => file.path === "LICENSE"));
+  assert.ok(pack.files.some((file: { path: string; }) => file.path === "NOTICE"));
+  assert.ok(pack.files.every((file: { path: string; }) => /^(dist\/|README\.md$|LICENSE$|NOTICE$|package\.json$)/.test(file.path)));
+  const archive = join(temporary, pack.filename);
+  assert.equal(run("tar", ["-xOf", archive, "package/LICENSE"]), readFileSync(join(root, "packages/client/LICENSE"), "utf8"));
+  assert.equal(run("tar", ["-xOf", archive, "package/NOTICE"]), readFileSync(join(root, "packages/client/NOTICE"), "utf8"));
+  assert.equal(JSON.parse(run("tar", ["-xOf", archive, "package/package.json"])).license, "Apache-2.0");
   const example = JSON.parse(readFileSync(join(root, "examples/collaboration/package.json"), "utf8"));
   const workspace = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   writeFileSync(join(temporary, "package.json"), JSON.stringify({ private: true, type: "module", dependencies: {

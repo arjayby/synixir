@@ -4,6 +4,9 @@ A browser SDK for Synixir rooms. It owns the Yjs document, awareness, authorized
 connection, chunk transfers, durable save tracking, and reconnect recovery.
 It works with any Yjs binding; the repository's CodeMirror example uses this API.
 
+This SDK is licensed under [Apache-2.0](LICENSE); preserve the included [NOTICE](NOTICE)
+when distributing it. The Synixir backend is licensed separately under AGPL-3.0-or-later.
+
 This package is in development and is not published to npm. From the repository
 root, run `npm ci`, then `npm pack --workspace @synixir/client`. Install that
 tarball in your application along with `yjs@^13.6.32`:

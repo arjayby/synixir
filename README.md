@@ -99,3 +99,12 @@ pilot that checks collaboration, app replacement, and database recovery.
   unconfirmed changes.
 - Public hosting, external alert delivery, and off-machine backup scheduling
   require separate setup.
+
+## License
+
+The backend is licensed under **AGPL-3.0-or-later**. The JavaScript SDK in
+`packages/client/` and playground examples in `examples/collaboration/` are
+licensed under **Apache-2.0**. Third-party components keep their own licenses.
+See [the licensing policy](LICENSING.md) for scope, self-hosting, and source-sharing
+requirements. Paid managed hosting is permitted; self-hosting under the AGPL does
+not require a license fee.

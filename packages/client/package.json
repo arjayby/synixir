@@ -1,5 +1,6 @@
 {
   "name": "@synixir/client",
+  "license": "Apache-2.0",
   "version": "0.1.0",
   "description": "Synixir room synchronization, awareness, durable save status, and recovery for Yjs applications",
   "type": "module",
@@ -13,7 +14,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -4,6 +4,10 @@ This app uses TypeScript, React, Next.js App Router, shadcn/ui (Radix), and
 Tailwind CSS. Elixir/Phoenix owns accounts, room permissions, WebSockets, and
 PostgreSQL persistence. The browser consumes `@synixir/client`.
 
+The playground example code is licensed under [Apache-2.0](LICENSE), with its
+copyright notice in [NOTICE](NOTICE). The Synixir backend is licensed separately
+under AGPL-3.0-or-later. Third-party libraries and assets keep their own licenses.
+
 From the repository root, start Phoenix with the
 [local setup guide](../../docs/development.md#local-setup), then:
 

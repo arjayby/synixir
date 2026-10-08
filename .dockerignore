@@ -1,5 +1,7 @@
 **
 !Dockerfile
+!LICENSE
+!LICENSING.md
 !mix.exs
 !mix.lock
 !package.json
@@ -17,12 +19,16 @@
 !packages/
 !packages/client/
 !packages/client/package.json
+!packages/client/LICENSE
+!packages/client/NOTICE
 !packages/client/tsconfig.json
 !packages/client/src/
 !packages/client/src/**
 !examples/
 !examples/collaboration/
 !examples/collaboration/package.json
+!examples/collaboration/LICENSE
+!examples/collaboration/NOTICE
 !examples/collaboration/**/
 !examples/collaboration/**/*.ts
 !examples/collaboration/**/*.tsx
